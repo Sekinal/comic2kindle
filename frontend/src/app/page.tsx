@@ -1,0 +1,95 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { BookOpen, ArrowRight, Zap, Shield, Download } from "lucide-react";
+
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <div className="container mx-auto px-4 py-16 md:py-24">
+        <div className="flex flex-col items-center text-center space-y-8">
+          <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10">
+            <BookOpen className="h-12 w-12 text-primary" />
+          </div>
+
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+            Manga to Kindle
+          </h1>
+
+          <p className="text-xl text-muted-foreground max-w-2xl">
+            Convert your manga collection (CBR/CBZ) to Kindle-compatible EPUB or
+            MOBI formats with proper metadata from MangaDex and AniList.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button size="lg" asChild>
+              <Link href="/convert">
+                Start Converting
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <div className="border-t bg-muted/30">
+        <div className="container mx-auto px-4 py-16">
+          <h2 className="text-2xl font-bold text-center mb-12">Features</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <FeatureCard
+              icon={<Zap className="h-6 w-6" />}
+              title="Fast Conversion"
+              description="Convert multiple manga files at once with batch processing and automatic chapter numbering."
+            />
+            <FeatureCard
+              icon={<Download className="h-6 w-6" />}
+              title="Metadata Lookup"
+              description="Automatically fetch cover art and metadata from MangaDex and AniList for your manga."
+            />
+            <FeatureCard
+              icon={<Shield className="h-6 w-6" />}
+              title="Kindle Ready"
+              description="Output files are optimized for Kindle devices with proper formatting and right-to-left reading."
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t py-8">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>
+            Manga to Kindle Converter • Open Source •{" "}
+            <Link
+              href="https://github.com"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              GitHub
+            </Link>
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function FeatureCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center p-6 rounded-lg border bg-card">
+      <div className="p-3 rounded-full bg-primary/10 text-primary mb-4">
+        {icon}
+      </div>
+      <h3 className="font-semibold mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
