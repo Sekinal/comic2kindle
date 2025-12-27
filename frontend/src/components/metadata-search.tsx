@@ -66,7 +66,7 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>
@@ -95,7 +95,7 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
             {results.map((result) => (
               <div
                 key={result.id}
-                className="flex gap-4 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                className="flex gap-4 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors overflow-hidden"
                 onClick={() => handleSelect(result)}
               >
                 {result.cover_url && (
@@ -103,23 +103,23 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
                   <img
                     src={getCoverImageUrl(result.cover_url)}
                     alt={result.title}
-                    className="w-16 h-24 object-cover rounded"
+                    className="w-16 h-24 object-cover rounded shrink-0"
                   />
                 )}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-medium truncate">{result.title}</h4>
+                    <h4 className="font-medium truncate flex-1 min-w-0">{result.title}</h4>
                     <Badge variant="secondary" className="text-xs shrink-0">
                       {result.source}
                     </Badge>
                   </div>
                   {result.author && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground truncate">
                       {t("by")} {result.author}
                     </p>
                   )}
                   {result.description && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 break-words">
                       {result.description}
                     </p>
                   )}
