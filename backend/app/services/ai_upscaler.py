@@ -95,6 +95,8 @@ class AIUpscaler:
                 str(input_path),
                 "-o",
                 str(output_path),
+                "-m",
+                str(self.model_path / "models"),
                 "-n",
                 model,
                 "-s",

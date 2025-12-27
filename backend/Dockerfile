@@ -23,11 +23,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unrar-free \
     p7zip-full \
     curl \
+    unzip \
     libgl1 \
     libglib2.0-0 \
     libegl1 \
     libxkbcommon0 \
+    libvulkan1 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Download and install Real-ESRGAN for AI upscaling (with models)
+RUN mkdir -p /app/realesrgan && \
+    curl -L -o /tmp/realesrgan.zip \
+    "https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/releases/download/v0.2.0/realesrgan-ncnn-vulkan-v0.2.0-ubuntu.zip" && \
+    unzip /tmp/realesrgan.zip -d /tmp && \
+    mv /tmp/realesrgan-ncnn-vulkan-v0.2.0-ubuntu/* /app/realesrgan/ && \
+    chmod +x /app/realesrgan/realesrgan-ncnn-vulkan && \
+    rm -rf /tmp/realesrgan.zip /tmp/realesrgan-ncnn-vulkan-v0.2.0-ubuntu && \
+    # Download ncnn models (bin + param files for each scale)
+    mkdir -p /app/realesrgan/models && \
+    for scale in x2 x3 x4; do \
+        curl -L -o "/app/realesrgan/models/realesr-animevideov3-${scale}.bin" \
+        "https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/raw/master/models/realesr-animevideov3-${scale}.bin" && \
+        curl -L -o "/app/realesrgan/models/realesr-animevideov3-${scale}.param" \
+        "https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/raw/master/models/realesr-animevideov3-${scale}.param"; \
+    done
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser
@@ -45,8 +65,8 @@ RUN mkdir -p /app/uploads /app/output /app/previews && \
 
 USER appuser
 
-# Add venv to PATH
-ENV PATH="/app/.venv/bin:$PATH"
+# Add venv and realesrgan to PATH
+ENV PATH="/app/.venv/bin:/app/realesrgan:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
