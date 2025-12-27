@@ -1,6 +1,8 @@
 import type {
+  Capabilities,
   ConversionJob,
   ConversionRequest,
+  DeviceProfile,
   DownloadInfo,
   FileInfo,
   FilenameParseResult,
@@ -54,6 +56,19 @@ export async function deleteSession(sessionId: string): Promise<void> {
   });
   if (!response.ok) {
     throw new ApiError(response.status, "Failed to delete session");
+  }
+}
+
+/** Delete a single file from a session */
+export async function deleteFile(
+  sessionId: string,
+  fileId: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/upload/${sessionId}/${fileId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, "Failed to delete file");
   }
 }
 
@@ -144,6 +159,24 @@ export function getDownloadUrl(sessionId: string, filename: string): string {
 /** Get download URL for all files as ZIP */
 export function getAllDownloadsUrl(sessionId: string): string {
   return `${API_BASE}/download/${sessionId}/all`;
+}
+
+/** Get all available device profiles */
+export async function getDevices(): Promise<DeviceProfile[]> {
+  const response = await fetch(`${API_BASE}/devices`);
+  return handleResponse<DeviceProfile[]>(response);
+}
+
+/** Get a specific device profile */
+export async function getDevice(profileId: string): Promise<DeviceProfile> {
+  const response = await fetch(`${API_BASE}/devices/${profileId}`);
+  return handleResponse<DeviceProfile>(response);
+}
+
+/** Get system capabilities (AI upscaling, supported formats) */
+export async function getCapabilities(): Promise<Capabilities> {
+  const response = await fetch(`${API_BASE}/devices/capabilities`);
+  return handleResponse<Capabilities>(response);
 }
 
 export { ApiError };

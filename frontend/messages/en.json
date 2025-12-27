@@ -11,9 +11,12 @@
     "success": "Success",
     "save": "Save",
     "delete": "Delete",
+    "remove": "Remove",
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
-    "applyToAll": "Apply to all"
+    "applyToAll": "Apply to all",
+    "quickMode": "Quick Mode",
+    "wizardMode": "Guided Mode"
   },
   "nav": {
     "title": "Manga to Kindle",
@@ -45,9 +48,55 @@
       "preview": "Preview",
       "order": "Order",
       "noFiles": "No files uploaded yet",
-      "selectAll": "Select all files"
+      "selectAll": "Select all files",
+      "removeFile": "Remove file",
+      "confirmRemove": "Remove this file from conversion?"
     },
     "dragToReorder": "Drag to reorder files for merging"
+  },
+  "device": {
+    "title": "Target Device",
+    "description": "Select your e-reader for optimized image sizing",
+    "kindle": "Kindle",
+    "kobo": "Kobo",
+    "custom": "Custom Dimensions",
+    "customLabel": "Custom",
+    "customDimensions": "Enter dimensions",
+    "width": "Width (px)",
+    "height": "Height (px)"
+  },
+  "imageProcessing": {
+    "title": "Image Processing",
+    "description": "Configure how images are processed for your device",
+    "upscaleMethod": "Upscale Method",
+    "none": "None",
+    "noneDesc": "Keep original size (downscale only if larger)",
+    "lanczos": "Lanczos",
+    "lanczosDesc": "High-quality traditional upscaling",
+    "aiEsrgan": "AI (Real-ESRGAN)",
+    "aiEsrganDesc": "Best quality for manga/anime",
+    "aiNotAvailable": "AI upscaling not available on this server",
+    "recommended": "Recommended",
+    "bestQuality": "Best Quality",
+    "spreadOptions": "Double-Page Spread Options",
+    "detectSpreads": "Detect double-page spreads",
+    "detectSpreadsDesc": "Identify landscape images as two-page spreads",
+    "rotateSpreads": "Rotate spreads for reading",
+    "rotateSpreadsDesc": "Rotate spreads 90° for portrait viewing",
+    "fillScreen": "Fill screen",
+    "fillScreenDesc": "Size images to fill the device screen"
+  },
+  "chapter": {
+    "title": "Chapter Information",
+    "start": "Chapter Start",
+    "end": "Chapter End",
+    "rangeHelp": "For merged files, specify the chapter range (e.g., 1-16)",
+    "volume": "Volume #",
+    "volumeOptional": "Optional",
+    "titleFormat": "Title Format",
+    "titleFormatHelp": "Use {series}, {chapter}, {volume} as placeholders",
+    "preview": "Preview",
+    "examples": "Examples: Ch. 1, Ch. 1-16, Vol. 2 Ch. 5"
   },
   "metadata": {
     "title": "Metadata",
@@ -59,9 +108,12 @@
       "title": "Title",
       "author": "Author",
       "series": "Series",
-      "volume": "Volume/Chapter #",
+      "chapterStart": "Chapter Start",
+      "chapterEnd": "Chapter End",
+      "volume": "Volume",
       "description": "Description",
-      "tags": "Tags"
+      "tags": "Tags",
+      "titleFormat": "Title Format"
     },
     "search": {
       "title": "Search Manga Metadata",
@@ -85,7 +137,7 @@
     },
     "namingPattern": {
       "label": "File Naming Pattern",
-      "help": "Use {series}, {title}, {index} as placeholders"
+      "help": "Use {series}, {title}, {chapter}, {volume} as placeholders"
     },
     "mergeFiles": {
       "label": "Merge all files into one",

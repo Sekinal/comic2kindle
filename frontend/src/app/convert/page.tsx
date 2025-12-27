@@ -2,13 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileDropzone } from "@/components/file-dropzone";
 import { FileList } from "@/components/file-list";
 import { MetadataEditor } from "@/components/metadata-editor";
 import { ConversionSettings } from "@/components/conversion-settings";
 import { ProgressTracker } from "@/components/progress-tracker";
+import { DeviceSelector } from "@/components/device-selector";
+import { ImageOptions } from "@/components/image-options";
 import { useConversionStore } from "@/lib/store";
 import { startConversion, deleteSession } from "@/lib/api";
 import { toast } from "sonner";
@@ -20,11 +26,14 @@ import {
   Download,
   Loader2,
   Trash2,
+  Zap,
 } from "lucide-react";
 
 type WizardStep = "upload" | "metadata" | "settings" | "download";
 
 export default function ConvertPage() {
+  const t = useTranslations("common");
+  const tSteps = useTranslations("steps");
   const [activeStep, setActiveStep] = useState<WizardStep>("upload");
   const [isConverting, setIsConverting] = useState(false);
 
@@ -38,13 +47,17 @@ export default function ConvertPage() {
   const fileOrder = useConversionStore((s) => s.fileOrder);
   const epubMode = useConversionStore((s) => s.epubMode);
   const maxOutputSizeMb = useConversionStore((s) => s.maxOutputSizeMb);
+  const imageOptions = useConversionStore((s) => s.imageOptions);
   const currentJob = useConversionStore((s) => s.currentJob);
   const setCurrentJob = useConversionStore((s) => s.setCurrentJob);
   const reset = useConversionStore((s) => s.reset);
+  const viewMode = useConversionStore((s) => s.viewMode);
+  const setViewMode = useConversionStore((s) => s.setViewMode);
 
   const canProceedToMetadata = files.length > 0 && selectedFileIds.length > 0;
   const canProceedToSettings = metadata.title.trim().length > 0;
   const canStartConversion = selectedFileIds.length > 0;
+  const isQuickMode = viewMode === "quick";
 
   const handleStartConversion = async () => {
     if (!sessionId || !canStartConversion) return;
@@ -61,10 +74,11 @@ export default function ConvertPage() {
         merge_files: mergeFiles,
         file_order: fileOrder,
         max_output_size_mb: maxOutputSizeMb,
+        image_options: imageOptions,
       });
       setCurrentJob(job);
       setActiveStep("download");
-      toast.success("Conversion started");
+      toast.success(t("success"));
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to start conversion"
@@ -97,119 +111,43 @@ export default function ConvertPage() {
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
-            <h1 className="text-xl font-semibold">Convert Manga</h1>
+            <h1 className="text-xl font-semibold">{t("convert")}</h1>
           </div>
-          {sessionId && (
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Start Over
-            </Button>
-          )}
+          <div className="flex items-center gap-4">
+            {/* Quick Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <Zap className={`h-4 w-4 ${isQuickMode ? "text-primary" : "text-muted-foreground"}`} />
+              <Label htmlFor="quick-mode" className="text-sm cursor-pointer">
+                {t("quickMode")}
+              </Label>
+              <Switch
+                id="quick-mode"
+                checked={isQuickMode}
+                onCheckedChange={(checked) => setViewMode(checked ? "quick" : "wizard")}
+              />
+            </div>
+            {sessionId && (
+              <Button variant="outline" size="sm" onClick={handleReset}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                {t("cancel")}
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <Tabs
-          value={activeStep}
-          onValueChange={(v) => setActiveStep(v as WizardStep)}
-          className="space-y-8"
-        >
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="upload" className="gap-2">
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Upload</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="metadata"
-              disabled={!canProceedToMetadata}
-              className="gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Metadata</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              disabled={!canProceedToSettings}
-              className="gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="download"
-              disabled={!currentJob}
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Download</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Upload Step */}
-          <TabsContent value="upload" className="space-y-6">
-            <FileDropzone />
-            <FileList />
-            {canProceedToMetadata && (
-              <div className="flex justify-end">
-                <Button onClick={() => setActiveStep("metadata")}>
-                  Continue to Metadata
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Metadata Step */}
-          <TabsContent value="metadata" className="space-y-6">
-            <MetadataEditor />
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setActiveStep("upload")}>
-                Back
-              </Button>
-              <Button
-                onClick={() => setActiveStep("settings")}
-                disabled={!canProceedToSettings}
-              >
-                Continue to Settings
-              </Button>
-            </div>
-          </TabsContent>
-
-          {/* Settings Step */}
-          <TabsContent value="settings" className="space-y-6">
-            <ConversionSettings />
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => setActiveStep("metadata")}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={handleStartConversion}
-                disabled={!canStartConversion || isConverting}
-              >
-                {isConverting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>Start Conversion</>
-                )}
-              </Button>
-            </div>
-          </TabsContent>
-
-          {/* Download Step */}
-          <TabsContent value="download" className="space-y-6">
+        {currentJob ? (
+          /* Download/Progress View */
+          <div className="space-y-6">
             <ProgressTracker />
-            {currentJob?.status === "completed" && (
+            {currentJob.status === "completed" && (
               <div className="flex justify-center">
-                <Button onClick={handleReset}>Convert More Files</Button>
+                <Button onClick={handleReset}>{t("convert")} More Files</Button>
               </div>
             )}
-            {currentJob?.status === "failed" && (
+            {currentJob.status === "failed" && (
               <div className="flex justify-center gap-4">
                 <Button variant="outline" onClick={handleReset}>
                   Start Over
@@ -217,8 +155,163 @@ export default function ConvertPage() {
                 <Button onClick={handleStartConversion}>Retry</Button>
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        ) : isQuickMode ? (
+          /* Quick Mode - All options on one page */
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Left Column - Upload & Files */}
+            <div className="space-y-6">
+              <FileDropzone />
+              <FileList />
+            </div>
+
+            {/* Right Column - Settings */}
+            <div className="space-y-6">
+              {canProceedToMetadata && (
+                <>
+                  <MetadataEditor />
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{tSteps("settings")}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <DeviceSelector />
+                      <ImageOptions />
+                    </CardContent>
+                  </Card>
+                  <ConversionSettings />
+                </>
+              )}
+            </div>
+
+            {/* Convert Button - Full Width */}
+            {canProceedToMetadata && (
+              <div className="lg:col-span-2 flex justify-center pt-4 border-t">
+                <Button
+                  size="lg"
+                  onClick={handleStartConversion}
+                  disabled={!canStartConversion || isConverting}
+                  className="px-8"
+                >
+                  {isConverting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {t("loading")}
+                    </>
+                  ) : (
+                    <>{t("convert")}</>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Wizard Mode - Step by step tabs */
+          <Tabs
+            value={activeStep}
+            onValueChange={(v) => setActiveStep(v as WizardStep)}
+            className="space-y-8"
+          >
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="upload" className="gap-2">
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">{tSteps("upload")}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="metadata"
+                disabled={!canProceedToMetadata}
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">{tSteps("metadata")}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="settings"
+                disabled={!canProceedToSettings}
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">{tSteps("settings")}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="download"
+                disabled={!currentJob}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">{tSteps("download")}</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Upload Step */}
+            <TabsContent value="upload" className="space-y-6">
+              <FileDropzone />
+              <FileList />
+              {canProceedToMetadata && (
+                <div className="flex justify-end">
+                  <Button onClick={() => setActiveStep("metadata")}>
+                    {t("next")}
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Metadata Step */}
+            <TabsContent value="metadata" className="space-y-6">
+              <MetadataEditor />
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setActiveStep("upload")}>
+                  {t("back")}
+                </Button>
+                <Button
+                  onClick={() => setActiveStep("settings")}
+                  disabled={!canProceedToSettings}
+                >
+                  {t("next")}
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* Settings Step */}
+            <TabsContent value="settings" className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-6">
+                  <DeviceSelector />
+                  <ImageOptions />
+                </div>
+                <div>
+                  <ConversionSettings />
+                </div>
+              </div>
+              <div className="flex justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => setActiveStep("metadata")}
+                >
+                  {t("back")}
+                </Button>
+                <Button
+                  onClick={handleStartConversion}
+                  disabled={!canStartConversion || isConverting}
+                >
+                  {isConverting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {t("loading")}
+                    </>
+                  ) : (
+                    <>{t("convert")}</>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* Download Step - shown when conversion is in progress */}
+            <TabsContent value="download" className="space-y-6">
+              <ProgressTracker />
+            </TabsContent>
+          </Tabs>
+        )}
       </main>
     </div>
   );

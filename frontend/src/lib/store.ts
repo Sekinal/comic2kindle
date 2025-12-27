@@ -1,11 +1,18 @@
 import { create } from "zustand";
 import type {
+  ChapterInfo,
   ConversionJob,
+  DeviceProfileId,
   EpubExtractionMode,
   FileInfo,
+  ImageProcessingOptions,
   MangaMetadata,
   OutputFormat,
+  UpscaleMethod,
 } from "@/types";
+
+/** View mode for the conversion page */
+export type ViewMode = "wizard" | "quick";
 
 interface ConversionState {
   // Session
@@ -23,6 +30,12 @@ interface ConversionState {
   epubMode: EpubExtractionMode;
   maxOutputSizeMb: number;
 
+  // Image processing
+  imageOptions: ImageProcessingOptions;
+
+  // View mode
+  viewMode: ViewMode;
+
   // Conversion
   selectedFileIds: string[];
   currentJob: ConversionJob | null;
@@ -35,7 +48,9 @@ interface ConversionState {
   setSession: (sessionId: string, files: FileInfo[]) => void;
   clearSession: () => void;
   setFiles: (files: FileInfo[]) => void;
+  removeFile: (fileId: string) => void;
   setMetadata: (metadata: Partial<MangaMetadata>) => void;
+  setChapterInfo: (chapterInfo: Partial<ChapterInfo>) => void;
   setNamingPattern: (pattern: string) => void;
   setOutputFormat: (format: OutputFormat) => void;
   setSelectedFileIds: (ids: string[]) => void;
@@ -47,17 +62,40 @@ interface ConversionState {
   reorderFile: (fromIndex: number, toIndex: number) => void;
   setEpubMode: (mode: EpubExtractionMode) => void;
   setMaxOutputSizeMb: (size: number) => void;
+  setImageOptions: (options: Partial<ImageProcessingOptions>) => void;
+  setDeviceProfile: (profile: DeviceProfileId) => void;
+  setUpscaleMethod: (method: UpscaleMethod) => void;
+  setViewMode: (mode: ViewMode) => void;
   reset: () => void;
 }
+
+const defaultChapterInfo: ChapterInfo = {
+  chapter_start: null,
+  chapter_end: null,
+  volume: null,
+  title_prefix: "",
+  title_suffix: "",
+};
 
 const defaultMetadata: MangaMetadata = {
   title: "",
   author: "",
   series: "",
-  series_index: 1,
+  chapter_info: { ...defaultChapterInfo },
   description: "",
   cover_url: null,
   tags: [],
+  title_format: "{series} - Ch. {chapter}",
+};
+
+const defaultImageOptions: ImageProcessingOptions = {
+  device_profile: "kindle_paperwhite_5",
+  custom_width: null,
+  custom_height: null,
+  upscale_method: "lanczos",
+  detect_spreads: true,
+  rotate_spreads: true,
+  fill_screen: true,
 };
 
 export const useConversionStore = create<ConversionState>((set, get) => ({
@@ -65,12 +103,14 @@ export const useConversionStore = create<ConversionState>((set, get) => ({
   sessionId: null,
   files: [],
   metadata: { ...defaultMetadata },
-  namingPattern: "{series} - Chapter {index:03d}",
+  namingPattern: "{series} - Ch. {chapter}",
   outputFormat: "epub",
   mergeFiles: false,
   fileOrder: [],
   epubMode: "images_only",
   maxOutputSizeMb: 200,
+  imageOptions: { ...defaultImageOptions },
+  viewMode: "wizard",
   selectedFileIds: [],
   currentJob: null,
 
@@ -107,9 +147,24 @@ export const useConversionStore = create<ConversionState>((set, get) => ({
 
   setFiles: (files) => set({ files }),
 
+  removeFile: (fileId) =>
+    set((state) => ({
+      files: state.files.filter((f) => f.id !== fileId),
+      selectedFileIds: state.selectedFileIds.filter((id) => id !== fileId),
+      fileOrder: state.fileOrder.filter((id) => id !== fileId),
+    })),
+
   setMetadata: (partial) =>
     set((state) => ({
       metadata: { ...state.metadata, ...partial },
+    })),
+
+  setChapterInfo: (partial) =>
+    set((state) => ({
+      metadata: {
+        ...state.metadata,
+        chapter_info: { ...state.metadata.chapter_info, ...partial },
+      },
     })),
 
   setNamingPattern: (pattern) => set({ namingPattern: pattern }),
@@ -148,17 +203,36 @@ export const useConversionStore = create<ConversionState>((set, get) => ({
 
   setMaxOutputSizeMb: (size) => set({ maxOutputSizeMb: size }),
 
+  setImageOptions: (options) =>
+    set((state) => ({
+      imageOptions: { ...state.imageOptions, ...options },
+    })),
+
+  setDeviceProfile: (profile) =>
+    set((state) => ({
+      imageOptions: { ...state.imageOptions, device_profile: profile },
+    })),
+
+  setUpscaleMethod: (method) =>
+    set((state) => ({
+      imageOptions: { ...state.imageOptions, upscale_method: method },
+    })),
+
+  setViewMode: (mode) => set({ viewMode: mode }),
+
   reset: () =>
     set({
       sessionId: null,
       files: [],
       metadata: { ...defaultMetadata },
-      namingPattern: "{series} - Chapter {index:03d}",
+      namingPattern: "{series} - Ch. {chapter}",
       outputFormat: "epub",
       mergeFiles: false,
       fileOrder: [],
       epubMode: "images_only",
       maxOutputSizeMb: 200,
+      imageOptions: { ...defaultImageOptions },
+      viewMode: "wizard",
       selectedFileIds: [],
       currentJob: null,
     }),

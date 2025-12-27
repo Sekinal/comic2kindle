@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -10,9 +12,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useConversionStore } from "@/lib/store";
-import { FileArchive, Images } from "lucide-react";
+import { deleteFile } from "@/lib/api";
+import { FileArchive, Images, Trash2, Loader2 } from "lucide-react";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -24,11 +37,17 @@ function formatBytes(bytes: number): string {
 
 export function FileList() {
   const t = useTranslations("upload.fileList");
+  const tCommon = useTranslations("common");
   const files = useConversionStore((s) => s.files);
   const selectedFileIds = useConversionStore((s) => s.selectedFileIds);
   const toggleFileSelection = useConversionStore((s) => s.toggleFileSelection);
   const selectAllFiles = useConversionStore((s) => s.selectAllFiles);
   const setSelectedFileIds = useConversionStore((s) => s.setSelectedFileIds);
+  const sessionId = useConversionStore((s) => s.sessionId);
+  const removeFile = useConversionStore((s) => s.removeFile);
+
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const allSelected = files.length > 0 && selectedFileIds.length === files.length;
   const someSelected = selectedFileIds.length > 0 && selectedFileIds.length < files.length;
@@ -40,6 +59,23 @@ export function FileList() {
       selectAllFiles();
     }
   };
+
+  const handleDeleteFile = async () => {
+    if (!fileToDelete || !sessionId) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteFile(sessionId, fileToDelete);
+      removeFile(fileToDelete);
+    } catch (error) {
+      console.error("Failed to delete file:", error);
+    } finally {
+      setIsDeleting(false);
+      setFileToDelete(null);
+    }
+  };
+
+  const fileToDeleteName = files.find((f) => f.id === fileToDelete)?.original_name;
 
   if (files.length === 0) {
     return null;
@@ -69,6 +105,7 @@ export function FileList() {
             <TableHead>{t("file")}</TableHead>
             <TableHead className="text-right">{t("size")}</TableHead>
             <TableHead className="text-right">{t("pages")}</TableHead>
+            <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -99,10 +136,54 @@ export function FileList() {
                   <span>{file.page_count || "?"}</span>
                 </div>
               </TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => setFileToDelete(file.id)}
+                  aria-label={t("removeFile")}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("removeFile")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("confirmRemove")}
+              {fileToDeleteName && (
+                <span className="block mt-2 font-medium text-foreground">
+                  {fileToDeleteName}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteFile}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {tCommon("loading")}
+                </>
+              ) : (
+                tCommon("remove")
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

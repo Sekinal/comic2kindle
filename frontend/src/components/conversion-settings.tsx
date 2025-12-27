@@ -67,11 +67,20 @@ export function ConversionSettings() {
   ];
 
   // Generate preview of naming pattern
+  const { chapter_info } = metadata;
+  let chapterStr = "";
+  if (chapter_info.chapter_start !== null && chapter_info.chapter_end !== null) {
+    chapterStr = `${chapter_info.chapter_start}-${chapter_info.chapter_end}`;
+  } else if (chapter_info.chapter_start !== null) {
+    chapterStr = String(chapter_info.chapter_start);
+  }
+  const volumeStr = chapter_info.volume ? String(chapter_info.volume) : "";
+
   const previewName = namingPattern
     .replace("{series}", metadata.series || "Manga")
     .replace("{title}", metadata.title || "Title")
-    .replace("{index:03d}", String(metadata.series_index).padStart(3, "0"))
-    .replace("{index}", String(metadata.series_index));
+    .replace("{chapter}", chapterStr || "1")
+    .replace("{volume}", volumeStr || "1");
 
   // Calculate estimated split count
   const totalSizeBytes = estimatedTotalSize();

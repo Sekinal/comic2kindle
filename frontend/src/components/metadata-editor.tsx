@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,9 +19,32 @@ import { getCoverImageUrl } from "@/lib/api";
 
 export function MetadataEditor() {
   const t = useTranslations("metadata");
+  const tChapter = useTranslations("chapter");
   const [showSearch, setShowSearch] = useState(false);
   const metadata = useConversionStore((s) => s.metadata);
   const setMetadata = useConversionStore((s) => s.setMetadata);
+  const setChapterInfo = useConversionStore((s) => s.setChapterInfo);
+
+  // Generate title preview
+  const titlePreview = useMemo(() => {
+    const { chapter_info, title_format, series, title } = metadata;
+    let chapterStr = "";
+    if (chapter_info.chapter_start !== null && chapter_info.chapter_end !== null) {
+      chapterStr = `${chapter_info.chapter_start}-${chapter_info.chapter_end}`;
+    } else if (chapter_info.chapter_start !== null) {
+      chapterStr = String(chapter_info.chapter_start);
+    }
+    const volumeStr = chapter_info.volume ? `Vol. ${chapter_info.volume}` : "";
+
+    return title_format
+      .replace("{series}", series || title || "Series")
+      .replace("{title}", title || "Title")
+      .replace("{chapter}", chapterStr || "1")
+      .replace("{volume}", volumeStr)
+      .replace("{prefix}", chapter_info.title_prefix)
+      .replace("{suffix}", chapter_info.title_suffix)
+      .trim();
+  }, [metadata]);
 
   return (
     <>
@@ -87,27 +110,95 @@ export function MetadataEditor() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="series">{t("fields.series")}</Label>
-                  <Input
-                    id="series"
-                    placeholder={t("fields.series")}
-                    value={metadata.series}
-                    onChange={(e) => setMetadata({ series: e.target.value })}
-                  />
+              <div className="grid gap-2">
+                <Label htmlFor="series">{t("fields.series")}</Label>
+                <Input
+                  id="series"
+                  placeholder={t("fields.series")}
+                  value={metadata.series}
+                  onChange={(e) => setMetadata({ series: e.target.value })}
+                />
+              </div>
+
+              {/* Chapter Information */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-sm font-medium">{tChapter("title")}</Label>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="chapter_start" className="text-xs text-muted-foreground">
+                      {tChapter("start")}
+                    </Label>
+                    <Input
+                      id="chapter_start"
+                      type="number"
+                      step="0.5"
+                      min={0}
+                      placeholder="1"
+                      value={metadata.chapter_info.chapter_start ?? ""}
+                      onChange={(e) =>
+                        setChapterInfo({
+                          chapter_start: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="chapter_end" className="text-xs text-muted-foreground">
+                      {tChapter("end")}
+                    </Label>
+                    <Input
+                      id="chapter_end"
+                      type="number"
+                      step="0.5"
+                      min={0}
+                      placeholder="16"
+                      value={metadata.chapter_info.chapter_end ?? ""}
+                      onChange={(e) =>
+                        setChapterInfo({
+                          chapter_end: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="volume" className="text-xs text-muted-foreground">
+                      {tChapter("volume")} <span className="text-muted-foreground/60">({tChapter("volumeOptional")})</span>
+                    </Label>
+                    <Input
+                      id="volume"
+                      type="number"
+                      min={1}
+                      placeholder="1"
+                      value={metadata.chapter_info.volume ?? ""}
+                      onChange={(e) =>
+                        setChapterInfo({
+                          volume: e.target.value ? parseInt(e.target.value) : null,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground">{tChapter("rangeHelp")}</p>
+              </div>
+
+              {/* Title Format */}
+              <div className="space-y-3 pt-2 border-t">
                 <div className="grid gap-2">
-                  <Label htmlFor="series_index">{t("fields.volume")}</Label>
+                  <Label htmlFor="title_format">{tChapter("titleFormat")}</Label>
                   <Input
-                    id="series_index"
-                    type="number"
-                    min={1}
-                    value={metadata.series_index}
-                    onChange={(e) =>
-                      setMetadata({ series_index: parseInt(e.target.value) || 1 })
-                    }
+                    id="title_format"
+                    placeholder="{series} - Ch. {chapter}"
+                    value={metadata.title_format}
+                    onChange={(e) => setMetadata({ title_format: e.target.value })}
                   />
+                  <p className="text-xs text-muted-foreground">{tChapter("titleFormatHelp")}</p>
+                </div>
+
+                {/* Live Preview */}
+                <div className="rounded-md bg-muted p-3">
+                  <Label className="text-xs text-muted-foreground">{tChapter("preview")}</Label>
+                  <p className="text-sm font-medium mt-1">{titlePreview}</p>
                 </div>
               </div>
 
