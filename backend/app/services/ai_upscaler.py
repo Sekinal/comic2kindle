@@ -159,8 +159,15 @@ def check_ai_upscaling_available() -> bool:
     """Check if AI upscaling is available on this system.
 
     Returns:
-        True if Real-ESRGAN is installed and ready
+        True if Real-ESRGAN is installed and a real GPU is available
     """
+    import os
+
+    # Disable AI upscaling in Docker (no GPU passthrough by default)
+    # Users can set ENABLE_AI_UPSCALING=1 if they have GPU passthrough configured
+    if os.path.exists("/.dockerenv") and not os.environ.get("ENABLE_AI_UPSCALING"):
+        return False
+
     try:
         upscaler = AIUpscaler()
         return upscaler.is_available()

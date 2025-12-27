@@ -57,7 +57,8 @@ RUN useradd --create-home --shell /bin/bash appuser
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY --from=builder /app/.venv /app/.venv
 
-# Copy application code
+# Copy application code (ARG to bust cache when code changes)
+ARG CACHEBUST=1
 COPY --chown=appuser:appuser ./app ./app
 
 # Create directories for uploads, output, and previews
