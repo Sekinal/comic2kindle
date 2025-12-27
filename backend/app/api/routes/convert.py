@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
-from app.api.deps import get_converter, get_extractor, get_file_manager, get_merger
+from app.api.deps import get_extractor, get_file_manager, get_merger
 from app.models.schemas import (
     ConversionJob,
     ConversionRequest,
@@ -37,7 +37,6 @@ async def _run_conversion(
     request: ConversionRequest,
     file_manager: FileManager,
     extractor: ExtractorService,
-    converter: ConverterService,
     merger: MergerService,
 ) -> None:
     """
@@ -48,6 +47,9 @@ async def _run_conversion(
     try:
         output_dir = file_manager.get_output_dir(request.session_id)
         session_dir = file_manager.get_session_dir(request.session_id)
+
+        # Create converter with image processing options from request
+        converter = ConverterService(image_options=request.image_options)
 
         # Determine file order
         file_ids = request.file_order if request.file_order else request.file_ids
@@ -148,14 +150,21 @@ async def _run_individual_conversion(
                 current_phase=f"Converting ({idx + 1}/{total_files})",
             )
 
-            # Generate output filename
+            # Generate output filename using chapter info
             metadata = request.metadata.model_copy()
-            metadata.series_index = idx + 1
+            # Set chapter number for individual files
+            if metadata.chapter_info.chapter_start is None:
+                metadata.chapter_info.chapter_start = float(idx + 1)
 
-            filename = request.naming_pattern.format(
-                series=metadata.series or metadata.title,
-                title=metadata.title,
-                index=metadata.series_index,
+            # Format filename using the naming pattern
+            chapter_str = metadata.chapter_info.format_chapter_string() or str(idx + 1)
+            filename = (
+                request.naming_pattern.replace("{series}", metadata.series or metadata.title)
+                .replace("{title}", metadata.title)
+                .replace("{chapter}", chapter_str)
+                .replace("{volume}", f"Vol. {metadata.chapter_info.volume}" if metadata.chapter_info.volume else "")
+                .replace("{index:03d}", f"{idx + 1:03d}")
+                .replace("{index}", str(idx + 1))
             )
             # Sanitize filename
             filename = "".join(
@@ -277,11 +286,15 @@ async def _run_merged_conversion(
             status=ConversionStatus.CONVERTING,
         )
 
-        # Generate base filename
-        filename = request.naming_pattern.format(
-            series=request.metadata.series or request.metadata.title,
-            title=request.metadata.title,
-            index=request.metadata.series_index,
+        # Generate base filename using chapter info
+        chapter_str = request.metadata.chapter_info.format_chapter_string() or "1"
+        filename = (
+            request.naming_pattern.replace("{series}", request.metadata.series or request.metadata.title)
+            .replace("{title}", request.metadata.title)
+            .replace("{chapter}", chapter_str)
+            .replace("{volume}", f"Vol. {request.metadata.chapter_info.volume}" if request.metadata.chapter_info.volume else "")
+            .replace("{index:03d}", "001")
+            .replace("{index}", "1")
         )
         filename = "".join(
             c for c in filename if c.isalnum() or c in " -_."
@@ -313,7 +326,6 @@ async def start_conversion(
     background_tasks: BackgroundTasks,
     file_manager: FileManager = Depends(get_file_manager),
     extractor: ExtractorService = Depends(get_extractor),
-    converter: ConverterService = Depends(get_converter),
     merger: MergerService = Depends(get_merger),
 ) -> ConversionJob:
     """
@@ -327,6 +339,8 @@ async def start_conversion(
     - Auto-splitting at configurable size threshold
     - EPUB input support with extraction mode
     - Custom file ordering for merge
+    - Device-specific image processing (upscaling, spread detection)
+    - Chapter range support for merged files
     """
     # Validate session exists
     session_dir = file_manager.get_session_dir(request.session_id)
@@ -367,7 +381,6 @@ async def start_conversion(
         request,
         file_manager,
         extractor,
-        converter,
         merger,
     )
 

@@ -342,3 +342,47 @@ async def delete_session(
     if preview_dir.exists():
         import shutil
         shutil.rmtree(preview_dir)
+
+
+@router.delete("/{session_id}/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_file(
+    session_id: str,
+    file_id: str,
+    file_manager: FileManager = Depends(get_file_manager),
+) -> None:
+    """
+    Delete a single file from a session.
+
+    Args:
+        session_id: The session ID
+        file_id: The file ID to delete
+
+    Raises:
+        404: If session or file not found
+    """
+    session_dir = file_manager.get_session_dir(session_id)
+
+    if not session_dir.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session not found: {session_id}",
+        )
+
+    # Find and delete the file
+    file_found = False
+    for file_path in file_manager.list_files(session_id):
+        if file_path.stem == file_id:
+            file_path.unlink()
+            file_found = True
+            break
+
+    if not file_found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {file_id}",
+        )
+
+    # Also delete the preview if it exists
+    preview_path = settings.preview_dir / session_id / f"{file_id}.jpg"
+    if preview_path.exists():
+        preview_path.unlink()

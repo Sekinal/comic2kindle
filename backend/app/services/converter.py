@@ -2,6 +2,7 @@
 
 import subprocess
 import uuid
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
@@ -9,16 +10,20 @@ from ebooklib import epub
 from PIL import Image
 
 from app.config import settings
-from app.models.schemas import MangaMetadata, OutputFormat
+from app.models.schemas import ImageProcessingOptions, MangaMetadata, OutputFormat
+from app.services.image_processor import ImageProcessorService
 
 
 class ConverterService:
     """Converts images to EPUB/MOBI ebooks."""
 
-    def __init__(self) -> None:
-        self.max_width = settings.max_image_width
-        self.max_height = settings.max_image_height
+    def __init__(
+        self,
+        image_options: Optional[ImageProcessingOptions] = None,
+    ) -> None:
         self.quality = settings.image_quality
+        self.image_options = image_options or ImageProcessingOptions()
+        self.image_processor = ImageProcessorService(self.image_options)
 
     def create_epub(
         self,
@@ -41,9 +46,15 @@ class ConverterService:
         """
         book = epub.EpubBook()
 
+        # Get target dimensions for viewport
+        target_width, target_height = self.image_processor.get_target_dimensions()
+
+        # Get display title (formatted with chapter info)
+        display_title = metadata.get_display_title()
+
         # Set metadata
         book.set_identifier(str(uuid.uuid4()))
-        book.set_title(metadata.title)
+        book.set_title(display_title)
         book.set_language("en")
 
         if metadata.author:
@@ -52,9 +63,16 @@ class ConverterService:
         # Add series metadata
         if metadata.series:
             book.add_metadata("DC", "series", metadata.series)
-            book.add_metadata(
-                "calibre", "series_index", str(metadata.series_index)
-            )
+            # Use chapter info for series index
+            chapter_str = metadata.chapter_info.format_chapter_string()
+            if chapter_str:
+                # For ranges like "1-16", use the start chapter as index
+                if metadata.chapter_info.chapter_start is not None:
+                    book.add_metadata(
+                        "calibre",
+                        "series_index",
+                        str(metadata.chapter_info.chapter_start),
+                    )
 
         if metadata.description:
             book.add_metadata("DC", "description", metadata.description)
@@ -65,7 +83,9 @@ class ConverterService:
         # Process and add cover
         cover_path = cover_image or (images[0] if images else None)
         if cover_path:
-            cover_content = self._process_image(cover_path)
+            cover_content = self.image_processor.process_image(
+                cover_path, self.quality
+            )
             book.set_cover("cover.jpg", cover_content)
 
         # Create chapters (one per page)
@@ -74,7 +94,9 @@ class ConverterService:
 
         for i, image_path in enumerate(images):
             page_num = i + 1
-            image_content = self._process_image(image_path)
+            image_content = self.image_processor.process_image(
+                image_path, self.quality
+            )
 
             # Create image item
             image_name = f"page_{page_num:04d}.jpg"
@@ -86,22 +108,24 @@ class ConverterService:
             )
             book.add_item(image_item)
 
-            # Create HTML page for the image
+            # Create HTML page for the image with proper viewport for e-reader
             chapter = epub.EpubHtml(
                 title=f"Page {page_num}",
                 file_name=f"page_{page_num:04d}.xhtml",
                 lang="en",
             )
-            chapter.content = f"""<html xmlns="http://www.w3.org/1999/xhtml">
+            chapter.content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>Page {page_num}</title>
-    <style type="text/css">
-        body {{ margin: 0; padding: 0; text-align: center; }}
-        img {{ max-width: 100%; max-height: 100%; height: auto; }}
-    </style>
+    <meta name="viewport" content="width={target_width}, height={target_height}"/>
+    <link rel="stylesheet" type="text/css" href="style/main.css"/>
 </head>
 <body>
-    <img src="images/{image_name}" alt="Page {page_num}"/>
+    <div class="page-container">
+        <img src="images/{image_name}" alt="Page {page_num}"/>
+    </div>
 </body>
 </html>"""
 
@@ -117,24 +141,51 @@ class ConverterService:
         # Set spine
         book.spine = spine
 
-        # Add CSS
-        style = """
-        @page {
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            text-align: center;
-            background-color: #000;
-        }
-        img {
-            max-width: 100%;
-            max-height: 100vh;
-            object-fit: contain;
-        }
-        """
+        # Add CSS optimized for full-screen manga display
+        style = f"""
+@page {{
+    margin: 0;
+    padding: 0;
+}}
+html, body {{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    overflow: hidden;
+}}
+.page-container {{
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #000;
+    box-sizing: border-box;
+}}
+img {{
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}}
+/* Fixed dimensions for consistent rendering on e-readers */
+@media amzn-kf8 {{
+    .page-container {{
+        width: {target_width}px;
+        height: {target_height}px;
+    }}
+}}
+@media amzn-mobi {{
+    .page-container {{
+        width: {target_width}px;
+        height: {target_height}px;
+    }}
+}}
+"""
         css = epub.EpubItem(
             uid="style",
             file_name="style/main.css",
@@ -300,23 +351,3 @@ class ConverterService:
 
         return output_files
 
-    def _process_image(self, image_path: Path) -> bytes:
-        """Process an image for inclusion in EPUB."""
-        with Image.open(image_path) as img:
-            # Convert to RGB if necessary
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
-
-            # Resize if too large
-            if img.width > self.max_width or img.height > self.max_height:
-                img.thumbnail(
-                    (self.max_width, self.max_height),
-                    Image.Resampling.LANCZOS,
-                )
-
-            # Save to bytes
-            from io import BytesIO
-
-            buffer = BytesIO()
-            img.save(buffer, format="JPEG", quality=self.quality, optimize=True)
-            return buffer.getvalue()

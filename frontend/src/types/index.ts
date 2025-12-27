@@ -18,6 +18,59 @@ export type ConversionStatus =
   | "completed"
   | "failed";
 
+/** Target e-reader device profiles */
+export type DeviceProfileId =
+  | "kindle_basic"
+  | "kindle_paperwhite_5"
+  | "kindle_scribe"
+  | "kobo_clara_2e"
+  | "kobo_libra_2"
+  | "kobo_sage"
+  | "custom";
+
+/** Image upscaling method */
+export type UpscaleMethod = "none" | "lanczos" | "ai_esrgan";
+
+/** Chapter information for flexible metadata */
+export interface ChapterInfo {
+  chapter_start: number | null;
+  chapter_end: number | null;
+  volume: number | null;
+  title_prefix: string;
+  title_suffix: string;
+}
+
+/** Image processing options for conversion */
+export interface ImageProcessingOptions {
+  device_profile: DeviceProfileId;
+  custom_width: number | null;
+  custom_height: number | null;
+  upscale_method: UpscaleMethod;
+  detect_spreads: boolean;
+  rotate_spreads: boolean;
+  fill_screen: boolean;
+}
+
+/** Device profile information */
+export interface DeviceProfile {
+  id: DeviceProfileId;
+  name: string;
+  display_name: string;
+  manufacturer: "kindle" | "kobo" | "custom";
+  width: number;
+  height: number;
+  dpi: number;
+  supports_color: boolean;
+  recommended_format: string;
+}
+
+/** System capabilities */
+export interface Capabilities {
+  ai_upscaling_available: boolean;
+  supported_input_formats: string[];
+  supported_output_formats: string[];
+}
+
 /** Information about an uploaded file */
 export interface FileInfo {
   id: string;
@@ -44,10 +97,11 @@ export interface MangaMetadata {
   title: string;
   author: string;
   series: string;
-  series_index: number;
+  chapter_info: ChapterInfo;
   description: string;
   cover_url: string | null;
   tags: string[];
+  title_format: string;
 }
 
 /** Result from metadata search */
@@ -71,6 +125,7 @@ export interface ConversionRequest {
   merge_files: boolean;
   file_order: string[];
   max_output_size_mb: number;
+  image_options: ImageProcessingOptions;
 }
 
 /** A conversion job */

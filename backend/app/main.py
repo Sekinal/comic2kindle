@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import convert, download, metadata, upload
+from app.api.routes import convert, devices, download, metadata, upload
 from app.config import settings
 
 app = FastAPI(
@@ -26,6 +26,7 @@ app.include_router(upload.router, prefix=settings.api_prefix, tags=["upload"])
 app.include_router(metadata.router, prefix=settings.api_prefix, tags=["metadata"])
 app.include_router(convert.router, prefix=settings.api_prefix, tags=["convert"])
 app.include_router(download.router, prefix=settings.api_prefix, tags=["download"])
+app.include_router(devices.router, prefix=settings.api_prefix, tags=["devices"])
 
 
 @app.get("/health")
