@@ -17,7 +17,7 @@ FROM python:3.12-slim AS runner
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (including Mesa Vulkan for software rendering)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     calibre \
     unrar-free \
@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libegl1 \
     libxkbcommon0 \
     libvulkan1 \
+    mesa-vulkan-drivers \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
