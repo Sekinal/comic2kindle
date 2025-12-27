@@ -88,7 +88,7 @@ class AIUpscaler:
             with Image.open(io.BytesIO(image_bytes)) as img:
                 img.save(input_path, format="PNG")
 
-            # Run Real-ESRGAN
+            # Run Real-ESRGAN (use CPU mode with -g -1 for Docker compatibility)
             cmd = [
                 self._binary_path,
                 "-i",
@@ -101,6 +101,8 @@ class AIUpscaler:
                 model,
                 "-s",
                 str(scale),
+                "-g",
+                "-1",  # Use CPU mode (GPU not available in Docker without passthrough)
             ]
 
             try:
