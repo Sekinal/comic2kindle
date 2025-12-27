@@ -179,4 +179,51 @@ export async function getCapabilities(): Promise<Capabilities> {
   return handleResponse<Capabilities>(response);
 }
 
+/**
+ * Batched initialization data - fetches devices and capabilities in parallel.
+ * Use this instead of separate getDevices() and getCapabilities() calls
+ * to reduce API round-trips during initial page load.
+ */
+export interface InitialData {
+  devices: DeviceProfile[];
+  capabilities: Capabilities;
+}
+
+// Cache for initialization data (devices and capabilities are static)
+let cachedInitialData: InitialData | null = null;
+let initialDataPromise: Promise<InitialData> | null = null;
+
+export async function getInitialData(): Promise<InitialData> {
+  // Return cached data if available
+  if (cachedInitialData) {
+    return cachedInitialData;
+  }
+
+  // Deduplicate in-flight requests
+  if (initialDataPromise) {
+    return initialDataPromise;
+  }
+
+  // Fetch both in parallel
+  initialDataPromise = Promise.all([
+    getDevices(),
+    getCapabilities(),
+  ]).then(([devices, capabilities]) => {
+    cachedInitialData = { devices, capabilities };
+    initialDataPromise = null;
+    return cachedInitialData;
+  }).catch((error) => {
+    initialDataPromise = null;
+    throw error;
+  });
+
+  return initialDataPromise;
+}
+
+/** Clear cached initialization data (useful for testing or refresh) */
+export function clearInitialDataCache(): void {
+  cachedInitialData = null;
+  initialDataPromise = null;
+}
+
 export { ApiError };

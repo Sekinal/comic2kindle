@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import {
   Card,
@@ -81,24 +81,79 @@ export function ProgressTracker() {
 
   const STATUS_CONFIG = getStatusConfig(t);
 
-  // Poll for job status
+  // Adaptive polling with exponential backoff
+  // Start fast (500ms), slow down if no progress, speed up if progressing
+  const pollIntervalRef = useRef(500);
+  const lastProgressRef = useRef(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const consecutiveErrorsRef = useRef(0);
+
+  const poll = useCallback(async () => {
+    if (!currentJob) return;
+    if (currentJob.status === "completed" || currentJob.status === "failed") {
+      return;
+    }
+
+    try {
+      const updated = await getJobStatus(currentJob.job_id);
+      setCurrentJob(updated);
+      consecutiveErrorsRef.current = 0;
+
+      // Calculate progress delta to adapt polling rate
+      const progressDelta = updated.progress - lastProgressRef.current;
+      lastProgressRef.current = updated.progress;
+
+      // Adaptive interval based on progress rate
+      if (progressDelta < 1) {
+        // Slow/no progress - back off to reduce server load
+        pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, 5000);
+      } else if (progressDelta >= 5) {
+        // Fast progress - poll more frequently for responsive UI
+        pollIntervalRef.current = Math.max(pollIntervalRef.current / 1.5, 300);
+      } else {
+        // Normal progress - moderate interval
+        pollIntervalRef.current = Math.max(pollIntervalRef.current / 1.2, 500);
+      }
+
+      // Schedule next poll if still in progress
+      if (updated.status !== "completed" && updated.status !== "failed") {
+        timeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+      }
+    } catch {
+      // On error, back off more aggressively
+      consecutiveErrorsRef.current++;
+      pollIntervalRef.current = Math.min(
+        pollIntervalRef.current * 2,
+        10000 // Max 10s on errors
+      );
+
+      // Stop polling after 5 consecutive errors
+      if (consecutiveErrorsRef.current < 5) {
+        timeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+      }
+    }
+  }, [currentJob, setCurrentJob]);
+
   useEffect(() => {
     if (!currentJob) return;
     if (currentJob.status === "completed" || currentJob.status === "failed") {
       return;
     }
 
-    const interval = setInterval(async () => {
-      try {
-        const updated = await getJobStatus(currentJob.job_id);
-        setCurrentJob(updated);
-      } catch {
-        // Ignore polling errors
-      }
-    }, 1000);
+    // Reset polling state for new job
+    pollIntervalRef.current = 500;
+    lastProgressRef.current = currentJob.progress;
+    consecutiveErrorsRef.current = 0;
 
-    return () => clearInterval(interval);
-  }, [currentJob, setCurrentJob]);
+    // Start polling
+    timeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [currentJob?.job_id, currentJob?.status, poll]);
 
   if (!currentJob) return null;
 

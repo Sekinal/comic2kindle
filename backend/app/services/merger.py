@@ -1,10 +1,24 @@
 """Service for merging multiple input files with auto-splitting."""
 
+import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CachedImageInfo:
+    """Cached image information to avoid redundant file reads."""
+
+    width: int
+    height: int
+    file_size: int
+    estimated_output_size: int
 
 
 class MergerService:
@@ -12,6 +26,62 @@ class MergerService:
 
     def __init__(self) -> None:
         self.max_output_size = settings.max_output_file_size
+        # Cache image info to avoid redundant PIL.open() calls
+        self._image_cache: dict[Path, CachedImageInfo] = {}
+
+    def clear_cache(self) -> None:
+        """Clear the image info cache."""
+        self._image_cache.clear()
+
+    def _get_image_info(self, image_path: Path) -> CachedImageInfo:
+        """Get cached image info, computing if not cached.
+
+        This eliminates redundant PIL.open() calls when the same
+        image is accessed multiple times (e.g., during estimation
+        and later during conversion).
+        """
+        if image_path in self._image_cache:
+            return self._image_cache[image_path]
+
+        try:
+            file_size = image_path.stat().st_size
+
+            with Image.open(image_path) as img:
+                width, height = img.size
+
+            # Calculate estimated output size
+            max_w = settings.max_image_width
+            max_h = settings.max_image_height
+            adjusted_file_size = file_size
+
+            if width > max_w or height > max_h:
+                ratio = min(max_w / width, max_h / height)
+                new_pixels = int(width * ratio) * int(height * ratio)
+                original_pixels = width * height
+                adjusted_file_size = int(file_size * (new_pixels / original_pixels))
+
+            # Compression factor (JPEG at 85%) + HTML overhead
+            estimated_output_size = int(adjusted_file_size * 0.7) + 500
+
+            info = CachedImageInfo(
+                width=width,
+                height=height,
+                file_size=file_size,
+                estimated_output_size=estimated_output_size,
+            )
+            self._image_cache[image_path] = info
+            return info
+
+        except Exception as e:
+            logger.warning(f"Failed to read image {image_path}: {e}")
+            # Fallback: use file size as estimate
+            file_size = image_path.stat().st_size
+            return CachedImageInfo(
+                width=0,
+                height=0,
+                file_size=file_size,
+                estimated_output_size=file_size,
+            )
 
     def merge_images(
         self,
@@ -65,10 +135,7 @@ class MergerService:
         """
         Estimate the EPUB output size for given images.
 
-        The estimation accounts for:
-        - JPEG compression (images are re-encoded)
-        - EPUB overhead (HTML, CSS, metadata)
-        - Image resizing (large images are scaled down)
+        Uses cached image info to avoid redundant file reads.
 
         Args:
             images: List of image paths
@@ -76,44 +143,10 @@ class MergerService:
         Returns:
             Estimated output size in bytes
         """
-        total_size = 0
         epub_overhead = 50_000  # ~50KB for EPUB structure
-
-        for image_path in images:
-            try:
-                # Get original file size
-                file_size = image_path.stat().st_size
-
-                # Estimate compressed size
-                # JPEG at 85% quality typically reduces to 60-80% of original
-                # Also account for resizing if image is too large
-                with Image.open(image_path) as img:
-                    width, height = img.size
-
-                    # If image needs resizing, it will be smaller
-                    max_w = settings.max_image_width
-                    max_h = settings.max_image_height
-
-                    if width > max_w or height > max_h:
-                        ratio = min(max_w / width, max_h / height)
-                        new_pixels = int(width * ratio) * int(height * ratio)
-                        original_pixels = width * height
-                        size_ratio = new_pixels / original_pixels
-                        file_size = int(file_size * size_ratio)
-
-                    # Apply compression factor
-                    compression_factor = 0.7
-                    estimated = int(file_size * compression_factor)
-
-                    # Add HTML wrapper overhead per page (~500 bytes)
-                    estimated += 500
-
-                    total_size += estimated
-
-            except Exception:
-                # If we can't read the image, use file size as-is
-                total_size += image_path.stat().st_size
-
+        total_size = sum(
+            self._get_image_info(path).estimated_output_size for path in images
+        )
         return total_size + epub_overhead
 
     def calculate_split_points(
@@ -171,23 +204,5 @@ class MergerService:
         return max(1, (total_size + self.max_output_size - 1) // self.max_output_size)
 
     def _estimate_single_image_size(self, image_path: Path) -> int:
-        """Estimate size contribution of a single image."""
-        try:
-            file_size = image_path.stat().st_size
-
-            with Image.open(image_path) as img:
-                width, height = img.size
-                max_w = settings.max_image_width
-                max_h = settings.max_image_height
-
-                if width > max_w or height > max_h:
-                    ratio = min(max_w / width, max_h / height)
-                    new_pixels = int(width * ratio) * int(height * ratio)
-                    original_pixels = width * height
-                    file_size = int(file_size * (new_pixels / original_pixels))
-
-            # Compression + HTML overhead
-            return int(file_size * 0.7) + 500
-
-        except Exception:
-            return image_path.stat().st_size
+        """Estimate size contribution of a single image using cache."""
+        return self._get_image_info(image_path).estimated_output_size

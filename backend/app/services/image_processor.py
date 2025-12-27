@@ -2,8 +2,11 @@
 
 import io
 import logging
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
+from threading import Lock
+from typing import Callable, Optional
 
 from PIL import Image
 
@@ -270,3 +273,130 @@ class ImageProcessorService:
             Tuple of (width, height)
         """
         return (self.target_width, self.target_height)
+
+
+class ParallelImageProcessor:
+    """Parallel image processor using ThreadPoolExecutor.
+
+    Processes multiple images concurrently while maintaining order
+    and providing thread-safe progress updates.
+
+    PIL releases the GIL during image operations, making ThreadPoolExecutor
+    highly effective for parallel image processing.
+    """
+
+    def __init__(
+        self,
+        options: Optional[ImageProcessingOptions] = None,
+        max_workers: Optional[int] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ):
+        """Initialize parallel processor.
+
+        Args:
+            options: Image processing options
+            max_workers: Maximum worker threads (default: min(cpu_count, 8))
+            progress_callback: Called with (completed_count, total_count)
+        """
+        self.options = options or ImageProcessingOptions()
+        # Cap workers at 8 to balance parallelism vs memory usage
+        self.max_workers = max_workers or min(os.cpu_count() or 4, 8)
+        self.progress_callback = progress_callback
+        self._processor = ImageProcessorService(self.options)
+        self._progress_lock = Lock()
+        self._completed_count = 0
+
+    def process_batch(
+        self,
+        image_paths: list[Path],
+        quality: int = 85,
+    ) -> list[tuple[int, bytes]]:
+        """Process images in parallel, returning ordered results.
+
+        Uses chunk-based processing to limit memory usage while maintaining
+        high throughput. Results are sorted by original index to preserve
+        page order for EPUB creation.
+
+        Args:
+            image_paths: List of image file paths
+            quality: JPEG quality (1-100)
+
+        Returns:
+            List of (index, image_bytes) tuples in original order
+        """
+        if not image_paths:
+            return []
+
+        total = len(image_paths)
+        self._completed_count = 0
+        results: list[tuple[int, bytes]] = []
+
+        # Process in chunks to limit concurrent memory usage
+        # Chunk size = 2x workers provides good pipeline utilization
+        chunk_size = self.max_workers * 2
+
+        logger.info(
+            f"Starting parallel processing of {total} images "
+            f"with {self.max_workers} workers (chunk size: {chunk_size})"
+        )
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for chunk_start in range(0, total, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, total)
+                chunk_paths = image_paths[chunk_start:chunk_end]
+
+                # Submit chunk for parallel processing
+                futures = {
+                    executor.submit(
+                        self._process_single, path, quality
+                    ): chunk_start + idx
+                    for idx, path in enumerate(chunk_paths)
+                }
+
+                # Collect results as they complete
+                for future in as_completed(futures):
+                    idx = futures[future]
+                    try:
+                        image_bytes = future.result()
+                        results.append((idx, image_bytes))
+                        self._update_progress(total)
+                    except Exception as e:
+                        logger.error(f"Failed to process image {idx}: {e}")
+                        raise ValueError(f"Failed to process image {idx}: {e}") from e
+
+        # Sort by original index to maintain page order
+        results.sort(key=lambda x: x[0])
+
+        logger.info(f"Completed parallel processing of {total} images")
+        return results
+
+    def _process_single(self, image_path: Path, quality: int) -> bytes:
+        """Process a single image (runs in thread pool).
+
+        Args:
+            image_path: Path to image file
+            quality: JPEG quality
+
+        Returns:
+            Processed image as bytes
+        """
+        return self._processor.process_image(image_path, quality)
+
+    def _update_progress(self, total: int) -> None:
+        """Thread-safe progress update.
+
+        Args:
+            total: Total number of images
+        """
+        with self._progress_lock:
+            self._completed_count += 1
+            if self.progress_callback:
+                self.progress_callback(self._completed_count, total)
+
+    def get_target_dimensions(self) -> tuple[int, int]:
+        """Get the target device dimensions from underlying processor.
+
+        Returns:
+            Tuple of (width, height)
+        """
+        return self._processor.get_target_dimensions()

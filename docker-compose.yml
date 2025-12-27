@@ -29,10 +29,19 @@ services:
       - PREVIEW_DIR=/app/previews
       - MAX_UPLOAD_SIZE=500000000  # 500MB
       - MAX_OUTPUT_FILE_SIZE=200000000  # 200MB (auto-split threshold)
+      # - ENABLE_AI_UPSCALING=1  # Disabled: CPU-only Vulkan is too slow. See DEBUG_NOTES.md
     volumes:
       - uploads:/app/uploads
       - output:/app/output
       - previews:/app/previews
+    # NVIDIA GPU support for AI upscaling (requires nvidia-container-toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

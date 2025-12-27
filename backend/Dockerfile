@@ -17,7 +17,7 @@ FROM python:3.12-slim AS runner
 
 WORKDIR /app
 
-# Install system dependencies (including Mesa Vulkan for software rendering)
+# Install system dependencies (including Vulkan for GPU and OpenMP for ncnn)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     calibre \
     unrar-free \
@@ -31,24 +31,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvulkan1 \
     mesa-vulkan-drivers \
     libgomp1 \
+    libomp5 \
+    vulkan-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install Real-ESRGAN for AI upscaling (with models)
-RUN mkdir -p /app/realesrgan && \
-    curl -L -o /tmp/realesrgan.zip \
-    "https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/releases/download/v0.2.0/realesrgan-ncnn-vulkan-v0.2.0-ubuntu.zip" && \
-    unzip /tmp/realesrgan.zip -d /tmp && \
-    mv /tmp/realesrgan-ncnn-vulkan-v0.2.0-ubuntu/* /app/realesrgan/ && \
-    chmod +x /app/realesrgan/realesrgan-ncnn-vulkan && \
-    rm -rf /tmp/realesrgan.zip /tmp/realesrgan-ncnn-vulkan-v0.2.0-ubuntu && \
-    # Download ncnn models (bin + param files for each scale)
-    mkdir -p /app/realesrgan/models && \
-    for scale in x2 x3 x4; do \
-        curl -L -o "/app/realesrgan/models/realesr-animevideov3-${scale}.bin" \
-        "https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/raw/master/models/realesr-animevideov3-${scale}.bin" && \
-        curl -L -o "/app/realesrgan/models/realesr-animevideov3-${scale}.param" \
-        "https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan/raw/master/models/realesr-animevideov3-${scale}.param"; \
-    done
+# NVIDIA environment for GPU passthrough
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser
@@ -67,10 +56,12 @@ RUN mkdir -p /app/uploads /app/output /app/previews && \
 
 USER appuser
 
-# Add venv and realesrgan to PATH
-ENV PATH="/app/.venv/bin:/app/realesrgan:$PATH"
+# Add venv to PATH
+ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run with multiple workers for better concurrent request handling
+# Workers = 4 provides good balance for typical deployment
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

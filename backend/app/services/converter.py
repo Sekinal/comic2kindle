@@ -1,17 +1,20 @@
 """EPUB/MOBI converter service."""
 
+import logging
 import subprocess
 import uuid
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from ebooklib import epub
 from PIL import Image
 
 from app.config import settings
 from app.models.schemas import ImageProcessingOptions, MangaMetadata, OutputFormat
-from app.services.image_processor import ImageProcessorService
+from app.services.image_processor import ImageProcessorService, ParallelImageProcessor
+
+logger = logging.getLogger(__name__)
 
 
 class ConverterService:
@@ -24,6 +27,7 @@ class ConverterService:
         self.quality = settings.image_quality
         self.image_options = image_options or ImageProcessingOptions()
         self.image_processor = ImageProcessorService(self.image_options)
+        logger.info(f"ConverterService initialized with image options: {self.image_options}")
 
     def create_epub(
         self,
@@ -31,15 +35,17 @@ class ConverterService:
         metadata: MangaMetadata,
         output_path: Path,
         cover_image: Optional[Path] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Path:
         """
-        Create an EPUB from a list of images.
+        Create an EPUB from a list of images using parallel processing.
 
         Args:
             images: List of image paths in reading order
             metadata: Manga metadata
             output_path: Path to save the EPUB
             cover_image: Optional custom cover image
+            progress_callback: Called with (completed, total) during processing
 
         Returns:
             Path to the created EPUB file
@@ -80,7 +86,7 @@ class ConverterService:
         # Set reading direction for manga (right-to-left)
         book.set_direction("rtl")
 
-        # Process and add cover
+        # Process and add cover (done separately, not part of parallel batch)
         cover_path = cover_image or (images[0] if images else None)
         if cover_path:
             cover_content = self.image_processor.process_image(
@@ -88,15 +94,25 @@ class ConverterService:
             )
             book.set_cover("cover.jpg", cover_content)
 
-        # Create chapters (one per page)
+        # PARALLEL IMAGE PROCESSING
+        # Process all images in parallel using ThreadPoolExecutor
+        # This is the main performance optimization - 6-8x speedup expected
+        parallel_processor = ParallelImageProcessor(
+            options=self.image_options,
+            progress_callback=progress_callback,
+        )
+
+        logger.info(f"Starting parallel processing of {len(images)} images")
+        processed_images = parallel_processor.process_batch(images, self.quality)
+        logger.info(f"Parallel processing complete: {len(processed_images)} images")
+
+        # EPUB ASSEMBLY (fast - just data copying)
+        # Build chapters from pre-processed images
         chapters = []
         spine = ["nav"]
 
-        for i, image_path in enumerate(images):
-            page_num = i + 1
-            image_content = self.image_processor.process_image(
-                image_path, self.quality
-            )
+        for idx, image_content in processed_images:
+            page_num = idx + 1
 
             # Create image item
             image_name = f"page_{page_num:04d}.jpg"
@@ -114,9 +130,8 @@ class ConverterService:
                 file_name=f"page_{page_num:04d}.xhtml",
                 lang="en",
             )
-            chapter.content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+            # ebooklib expects content as bytes, without XML declaration
+            html_content = f"""<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>Page {page_num}</title>
     <meta name="viewport" content="width={target_width}, height={target_height}"/>
@@ -128,6 +143,7 @@ class ConverterService:
     </div>
 </body>
 </html>"""
+            chapter.content = html_content.encode("utf-8")
 
             book.add_item(chapter)
             chapters.append(chapter)
@@ -196,7 +212,9 @@ img {{
 
         # Write EPUB
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Writing EPUB with {len(chapters)} pages to {output_path}")
         epub.write_epub(str(output_path), book)
+        logger.info(f"EPUB written successfully: {output_path.stat().st_size} bytes")
 
         return output_path
 
@@ -225,6 +243,7 @@ img {{
                 f'--output-profile=kindle --no-inline-toc --mobi-file-type=both'
             )
 
+            logger.info(f"Running MOBI conversion: {cmd}")
             result = subprocess.run(
                 cmd,
                 shell=True,
@@ -232,6 +251,11 @@ img {{
                 text=True,
                 timeout=600,  # 10 minute timeout
             )
+            logger.info(f"MOBI conversion result: returncode={result.returncode}")
+            if result.stdout:
+                logger.info(f"MOBI stdout: {result.stdout[:500]}")
+            if result.stderr:
+                logger.warning(f"MOBI stderr: {result.stderr[:500]}")
 
             if result.returncode != 0 or not output_path.exists():
                 raise ValueError(f"MOBI conversion failed: {result.stderr}")

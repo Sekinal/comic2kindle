@@ -1,12 +1,17 @@
 """Conversion API routes."""
 
+import asyncio
+import logging
 import tempfile
+import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 from app.api.deps import get_extractor, get_file_manager, get_merger
 from app.models.schemas import (
@@ -79,6 +84,8 @@ async def _run_conversion(
             )
 
     except Exception as e:
+        logger.error(f"Conversion failed: {e}")
+        logger.error(traceback.format_exc())
         _update_job(
             job_id,
             status=ConversionStatus.FAILED,
@@ -133,7 +140,10 @@ async def _run_individual_conversion(
         # Extract images to temp directory
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            images = extractor.extract(file_path, temp_path, request.epub_mode)
+            # Use asyncio.to_thread to avoid blocking the event loop
+            images = await asyncio.to_thread(
+                extractor.extract, file_path, temp_path, request.epub_mode
+            )
 
             if not images:
                 _update_job(
@@ -171,13 +181,15 @@ async def _run_individual_conversion(
                 c for c in filename if c.isalnum() or c in " -_."
             ).strip()
 
-            # Convert
-            created_files = converter.convert(
-                images=images,
-                metadata=metadata,
-                output_dir=output_dir,
-                output_format=request.output_format,
-                filename=filename,
+            # Convert using thread pool to avoid blocking event loop
+            # The converter uses parallel image processing internally
+            created_files = await asyncio.to_thread(
+                converter.convert,
+                images,
+                metadata,
+                output_dir,
+                request.output_format,
+                filename,
             )
 
             output_files.extend([f.name for f in created_files])
@@ -246,9 +258,11 @@ async def _run_merged_conversion(
                 progress=(idx / total_files) * 30,
             )
 
-            # Extract to unique subdirectory
+            # Extract to unique subdirectory using thread pool
             extract_dir = temp_base_path / f"extract_{idx:04d}"
-            images = extractor.extract(file_path, extract_dir, request.epub_mode)
+            images = await asyncio.to_thread(
+                extractor.extract, file_path, extract_dir, request.epub_mode
+            )
 
             if not images:
                 _update_job(
@@ -270,7 +284,10 @@ async def _run_merged_conversion(
         )
 
         max_size = request.max_output_size_mb * 1024 * 1024
-        image_batches = merger.merge_images(all_image_lists, max_size)
+        # Use thread pool for merger to avoid blocking event loop
+        image_batches = await asyncio.to_thread(
+            merger.merge_images, all_image_lists, max_size
+        )
         split_count = len(image_batches)
 
         _update_job(
@@ -300,13 +317,15 @@ async def _run_merged_conversion(
             c for c in filename if c.isalnum() or c in " -_."
         ).strip()
 
-        # Convert with auto-splitting
-        output_files = converter.convert_merged(
-            image_batches=image_batches,
-            metadata=request.metadata,
-            output_dir=output_dir,
-            output_format=request.output_format,
-            filename=filename,
+        # Convert with auto-splitting using thread pool
+        # The converter uses parallel image processing internally
+        output_files = await asyncio.to_thread(
+            converter.convert_merged,
+            image_batches,
+            request.metadata,
+            output_dir,
+            request.output_format,
+            filename,
         )
 
         _update_job(
