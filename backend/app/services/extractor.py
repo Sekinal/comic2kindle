@@ -1,26 +1,50 @@
-"""Archive extraction service for CBR/CBZ files."""
+"""Archive extraction service for CBR/CBZ/EPUB files."""
 
+import shutil
+import subprocess
+import tempfile
 import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
-import tempfile
-import subprocess
-import shutil
+
+from PIL import Image
+
+from app.config import settings
+from app.models.schemas import EpubExtractionMode
 
 # Image extensions to look for
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
 
 class ExtractorService:
-    """Extracts images from CBR/CBZ archives."""
+    """Extracts images from CBR/CBZ/EPUB archives."""
 
-    def extract(self, archive_path: Path, output_dir: Path) -> list[Path]:
+    def __init__(self, epub_reader: Optional["EpubReaderService"] = None) -> None:
+        self._epub_reader = epub_reader
+
+    @property
+    def epub_reader(self) -> "EpubReaderService":
+        """Lazy load epub reader to avoid circular imports."""
+        if self._epub_reader is None:
+            from app.services.epub_reader import EpubReaderService
+
+            self._epub_reader = EpubReaderService()
+        return self._epub_reader
+
+    def extract(
+        self,
+        archive_path: Path,
+        output_dir: Path,
+        epub_mode: EpubExtractionMode = EpubExtractionMode.IMAGES_ONLY,
+    ) -> list[Path]:
         """
         Extract images from an archive file.
 
         Args:
-            archive_path: Path to the CBR/CBZ file
+            archive_path: Path to the CBR/CBZ/EPUB file
             output_dir: Directory to extract images to
+            epub_mode: How to handle EPUB files
 
         Returns:
             List of paths to extracted images, sorted by name
@@ -32,8 +56,25 @@ class ExtractorService:
             return self._extract_zip(archive_path, output_dir)
         elif extension in {".cbr", ".rar"}:
             return self._extract_rar(archive_path, output_dir)
+        elif extension == ".epub":
+            return self._extract_epub(archive_path, output_dir, epub_mode)
         else:
             raise ValueError(f"Unsupported archive format: {extension}")
+
+    def _extract_epub(
+        self,
+        epub_path: Path,
+        output_dir: Path,
+        mode: EpubExtractionMode,
+    ) -> list[Path]:
+        """Extract images from an EPUB file."""
+        if mode == EpubExtractionMode.IMAGES_ONLY:
+            return self.epub_reader.extract_images(epub_path, output_dir)
+        else:
+            # Preserve structure mode - for now, still extract images
+            # but could be extended to preserve HTML structure
+            result = self.epub_reader.extract_with_structure(epub_path, output_dir)
+            return list(result["images"].values())
 
     def _extract_zip(self, archive_path: Path, output_dir: Path) -> list[Path]:
         """Extract a ZIP/CBZ archive."""
@@ -147,5 +188,108 @@ class ExtractorService:
             # For RAR, we'd need to actually extract or use a library
             # Return 0 for now, actual count happens during extraction
             return 0
+        elif extension == ".epub":
+            return self.epub_reader.count_pages(archive_path)
 
         return 0
+
+    def generate_preview(
+        self,
+        archive_path: Path,
+        output_path: Path,
+    ) -> Optional[Path]:
+        """
+        Generate a thumbnail preview of the first page.
+
+        Args:
+            archive_path: Path to the archive file
+            output_path: Path to save the thumbnail
+
+        Returns:
+            Path to the generated thumbnail or None if failed
+        """
+        extension = archive_path.suffix.lower()
+        first_image_data: Optional[bytes] = None
+
+        try:
+            if extension in {".cbz", ".zip"}:
+                first_image_data = self._get_first_image_zip(archive_path)
+            elif extension in {".cbr", ".rar"}:
+                first_image_data = self._get_first_image_rar(archive_path)
+            elif extension == ".epub":
+                first_image_data = self.epub_reader.get_cover_image(archive_path)
+
+            if first_image_data:
+                return self._create_thumbnail(first_image_data, output_path)
+
+        except Exception:
+            pass
+
+        return None
+
+    def _get_first_image_zip(self, archive_path: Path) -> Optional[bytes]:
+        """Get the first image from a ZIP archive."""
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            names = sorted(
+                [
+                    n
+                    for n in zf.namelist()
+                    if Path(n).suffix.lower() in IMAGE_EXTENSIONS
+                    and not n.startswith("__MACOSX")
+                ]
+            )
+            if names:
+                return zf.read(names[0])
+        return None
+
+    def _get_first_image_rar(self, archive_path: Path) -> Optional[bytes]:
+        """Get the first image from a RAR archive."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Try to extract just one file
+            try:
+                subprocess.run(
+                    ["7z", "x", str(archive_path), f"-o{temp_path}", "-y"],
+                    capture_output=True,
+                    timeout=60,
+                )
+            except Exception:
+                return None
+
+            # Find first image
+            images = sorted(
+                [
+                    f
+                    for f in temp_path.rglob("*")
+                    if f.suffix.lower() in IMAGE_EXTENSIONS
+                ]
+            )
+            if images:
+                return images[0].read_bytes()
+
+        return None
+
+    def _create_thumbnail(
+        self,
+        image_data: bytes,
+        output_path: Path,
+    ) -> Path:
+        """Create a thumbnail from image data."""
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with Image.open(BytesIO(image_data)) as img:
+            # Convert to RGB if necessary
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
+            # Create thumbnail
+            img.thumbnail(
+                (settings.preview_thumbnail_width, settings.preview_thumbnail_height),
+                Image.Resampling.LANCZOS,
+            )
+
+            # Save as JPEG
+            img.save(output_path, format="JPEG", quality=80)
+
+        return output_path

@@ -1,0 +1,40 @@
+# Virtual environments
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.egg-info
+dist
+build
+
+# Development
+*.log
+.env
+.env.*
+
+# Misc
+README.md
+*.md
+.git
+.gitignore
+tests

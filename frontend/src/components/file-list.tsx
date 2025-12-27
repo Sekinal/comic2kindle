@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -22,6 +23,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function FileList() {
+  const t = useTranslations("upload.fileList");
   const files = useConversionStore((s) => s.files);
   const selectedFileIds = useConversionStore((s) => s.selectedFileIds);
   const toggleFileSelection = useConversionStore((s) => s.toggleFileSelection);
@@ -61,12 +63,12 @@ export function FileList() {
                   }
                 }}
                 onCheckedChange={handleSelectAll}
-                aria-label="Select all"
+                aria-label={t("selectAll")}
               />
             </TableHead>
-            <TableHead>File</TableHead>
-            <TableHead className="text-right">Size</TableHead>
-            <TableHead className="text-right">Pages</TableHead>
+            <TableHead>{t("file")}</TableHead>
+            <TableHead className="text-right">{t("size")}</TableHead>
+            <TableHead className="text-right">{t("pages")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

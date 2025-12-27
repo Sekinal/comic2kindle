@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { useTranslations } from "next-intl";
 import { Upload, FileArchive, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uploadFiles } from "@/lib/api";
@@ -13,9 +14,12 @@ const ACCEPTED_TYPES = {
   "application/x-cbz": [".cbz"],
   "application/zip": [".zip"],
   "application/x-rar-compressed": [".rar"],
+  "application/epub+zip": [".epub"],
 };
 
 export function FileDropzone() {
+  const t = useTranslations("upload");
+  const tCommon = useTranslations("common");
   const [isUploading, setIsUploading] = useState(false);
   const setSession = useConversionStore((s) => s.setSession);
   const setMetadata = useConversionStore((s) => s.setMetadata);
@@ -32,11 +36,11 @@ export function FileDropzone() {
         // Auto-populate title from first file name
         if (response.files.length > 0) {
           const firstName = response.files[0].original_name;
-          const baseName = firstName.replace(/\.(cbr|cbz|zip|rar)$/i, "");
+          const baseName = firstName.replace(/\.(cbr|cbz|zip|rar|epub)$/i, "");
           setMetadata({ title: baseName, series: baseName });
         }
 
-        toast.success(`Uploaded ${response.files.length} file(s)`);
+        toast.success(`${response.files.length} file(s) uploaded`);
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Failed to upload files"
@@ -70,7 +74,7 @@ export function FileDropzone() {
       {isUploading ? (
         <>
           <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
-          <p className="mt-4 text-lg font-medium">Uploading...</p>
+          <p className="mt-4 text-lg font-medium">{tCommon("loading")}</p>
         </>
       ) : isDragActive ? (
         <>
@@ -81,13 +85,13 @@ export function FileDropzone() {
         <>
           <FileArchive className="h-12 w-12 text-muted-foreground" />
           <p className="mt-4 text-lg font-medium">
-            Drag & drop manga files here
+            {t("dropzone.title")}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            or click to select files
+            {t("dropzone.subtitle")}
           </p>
           <p className="mt-4 text-xs text-muted-foreground">
-            Supported formats: CBR, CBZ, ZIP, RAR
+            {t("dropzone.formats")}
           </p>
         </>
       )}

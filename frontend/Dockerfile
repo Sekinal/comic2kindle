@@ -3,6 +3,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Build argument for API URL (baked into the build)
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Install dependencies
 COPY package*.json ./
 RUN npm ci
@@ -26,6 +30,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Copy translation files for next-intl
+COPY --from=builder /app/messages ./messages
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app

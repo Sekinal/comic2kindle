@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   ConversionJob,
+  EpubExtractionMode,
   FileInfo,
   MangaMetadata,
   OutputFormat,
@@ -16,13 +17,24 @@ interface ConversionState {
   namingPattern: string;
   outputFormat: OutputFormat;
 
+  // Merge/Split settings
+  mergeFiles: boolean;
+  fileOrder: string[];
+  epubMode: EpubExtractionMode;
+  maxOutputSizeMb: number;
+
   // Conversion
   selectedFileIds: string[];
   currentJob: ConversionJob | null;
 
+  // Computed
+  hasEpubFiles: () => boolean;
+  estimatedTotalSize: () => number;
+
   // Actions
   setSession: (sessionId: string, files: FileInfo[]) => void;
   clearSession: () => void;
+  setFiles: (files: FileInfo[]) => void;
   setMetadata: (metadata: Partial<MangaMetadata>) => void;
   setNamingPattern: (pattern: string) => void;
   setOutputFormat: (format: OutputFormat) => void;
@@ -30,6 +42,11 @@ interface ConversionState {
   toggleFileSelection: (id: string) => void;
   selectAllFiles: () => void;
   setCurrentJob: (job: ConversionJob | null) => void;
+  setMergeFiles: (merge: boolean) => void;
+  setFileOrder: (order: string[]) => void;
+  reorderFile: (fromIndex: number, toIndex: number) => void;
+  setEpubMode: (mode: EpubExtractionMode) => void;
+  setMaxOutputSizeMb: (size: number) => void;
   reset: () => void;
 }
 
@@ -50,24 +67,45 @@ export const useConversionStore = create<ConversionState>((set, get) => ({
   metadata: { ...defaultMetadata },
   namingPattern: "{series} - Chapter {index:03d}",
   outputFormat: "epub",
+  mergeFiles: false,
+  fileOrder: [],
+  epubMode: "images_only",
+  maxOutputSizeMb: 200,
   selectedFileIds: [],
   currentJob: null,
 
+  // Computed
+  hasEpubFiles: () => get().files.some((f) => f.input_format === "epub"),
+
+  estimatedTotalSize: () => {
+    const state = get();
+    const selectedFiles = state.files.filter((f) =>
+      state.selectedFileIds.includes(f.id)
+    );
+    return selectedFiles.reduce((sum, f) => sum + f.estimated_output_size, 0);
+  },
+
   // Actions
-  setSession: (sessionId, files) =>
+  setSession: (sessionId, files) => {
+    const fileOrder = files.map((f) => f.id);
     set({
       sessionId,
       files,
-      selectedFileIds: files.map((f) => f.id),
-    }),
+      selectedFileIds: fileOrder,
+      fileOrder,
+    });
+  },
 
   clearSession: () =>
     set({
       sessionId: null,
       files: [],
       selectedFileIds: [],
+      fileOrder: [],
       currentJob: null,
     }),
+
+  setFiles: (files) => set({ files }),
 
   setMetadata: (partial) =>
     set((state) => ({
@@ -94,6 +132,22 @@ export const useConversionStore = create<ConversionState>((set, get) => ({
 
   setCurrentJob: (job) => set({ currentJob: job }),
 
+  setMergeFiles: (merge) => set({ mergeFiles: merge }),
+
+  setFileOrder: (order) => set({ fileOrder: order }),
+
+  reorderFile: (fromIndex, toIndex) =>
+    set((state) => {
+      const newOrder = [...state.fileOrder];
+      const [removed] = newOrder.splice(fromIndex, 1);
+      newOrder.splice(toIndex, 0, removed);
+      return { fileOrder: newOrder };
+    }),
+
+  setEpubMode: (mode) => set({ epubMode: mode }),
+
+  setMaxOutputSizeMb: (size) => set({ maxOutputSizeMb: size }),
+
   reset: () =>
     set({
       sessionId: null,
@@ -101,6 +155,10 @@ export const useConversionStore = create<ConversionState>((set, get) => ({
       metadata: { ...defaultMetadata },
       namingPattern: "{series} - Chapter {index:03d}",
       outputFormat: "epub",
+      mergeFiles: false,
+      fileOrder: [],
+      epubMode: "images_only",
+      maxOutputSizeMb: 200,
       selectedFileIds: [],
       currentJob: null,
     }),

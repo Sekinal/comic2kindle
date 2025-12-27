@@ -3,6 +3,7 @@ import type {
   ConversionRequest,
   DownloadInfo,
   FileInfo,
+  FilenameParseResult,
   MetadataSearchResult,
   UploadResponse,
 } from "@/types";
@@ -54,6 +55,41 @@ export async function deleteSession(sessionId: string): Promise<void> {
   if (!response.ok) {
     throw new ApiError(response.status, "Failed to delete session");
   }
+}
+
+/** Update file order for merging */
+export async function updateFileOrder(
+  sessionId: string,
+  fileOrder: string[]
+): Promise<FileInfo[]> {
+  const response = await fetch(`${API_BASE}/upload/${sessionId}/order`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_order: fileOrder }),
+  });
+  return handleResponse<FileInfo[]>(response);
+}
+
+/** Get file preview URL */
+export function getFilePreviewUrl(sessionId: string, fileId: string): string {
+  return `${API_BASE}/upload/${sessionId}/${fileId}/preview`;
+}
+
+/** Parse filename to extract metadata */
+export async function parseFilename(
+  sessionId: string,
+  fileId: string
+): Promise<FilenameParseResult> {
+  const response = await fetch(`${API_BASE}/upload/${sessionId}/${fileId}/parse`);
+  return handleResponse<FilenameParseResult>(response);
+}
+
+/** Get suggested file order based on filenames */
+export async function suggestFileOrder(sessionId: string): Promise<string[]> {
+  const response = await fetch(`${API_BASE}/upload/${sessionId}/suggest-order`, {
+    method: "POST",
+  });
+  return handleResponse<string[]>(response);
 }
 
 /** Search for manga metadata */

@@ -244,6 +244,62 @@ class ConverterService:
 
         return output_files
 
+    def convert_merged(
+        self,
+        image_batches: list[list[Path]],
+        metadata: MangaMetadata,
+        output_dir: Path,
+        output_format: OutputFormat,
+        filename: str,
+        cover_image: Optional[Path] = None,
+    ) -> list[Path]:
+        """
+        Convert multiple image batches to EPUB(s), handling auto-splitting.
+
+        Args:
+            image_batches: List of image batches (one per output file)
+            metadata: Manga metadata
+            output_dir: Directory to save output files
+            output_format: EPUB, MOBI, or BOTH
+            filename: Base filename (without extension)
+            cover_image: Optional custom cover image
+
+        Returns:
+            List of created file paths
+        """
+        output_files: list[Path] = []
+        total_parts = len(image_batches)
+
+        for part_num, images in enumerate(image_batches, start=1):
+            # Modify metadata for multi-part books
+            part_metadata = metadata.model_copy()
+            if total_parts > 1:
+                part_metadata.title = f"{metadata.title} (Part {part_num}/{total_parts})"
+
+            # Generate filename with part number if needed
+            if total_parts > 1:
+                part_filename = f"{filename}_part{part_num:02d}"
+            else:
+                part_filename = filename
+
+            # Use first image as cover for first part, or provided cover
+            part_cover = cover_image if part_num == 1 else None
+            if part_cover is None and images:
+                part_cover = images[0]
+
+            # Convert this batch
+            batch_files = self.convert(
+                images=images,
+                metadata=part_metadata,
+                output_dir=output_dir,
+                output_format=output_format,
+                filename=part_filename,
+                cover_image=part_cover,
+            )
+            output_files.extend(batch_files)
+
+        return output_files
+
     def _process_image(self, image_path: Path) -> bytes:
         """Process an image for inclusion in EPUB."""
         with Image.open(image_path) as img:

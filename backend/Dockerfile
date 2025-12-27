@@ -39,8 +39,8 @@ COPY --from=builder /app/.venv /app/.venv
 # Copy application code
 COPY --chown=appuser:appuser ./app ./app
 
-# Create directories for uploads and output
-RUN mkdir -p /app/uploads /app/output && \
+# Create directories for uploads, output, and previews
+RUN mkdir -p /app/uploads /app/output /app/previews && \
     chown -R appuser:appuser /app
 
 USER appuser

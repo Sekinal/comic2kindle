@@ -1,0 +1,167 @@
+{
+  "common": {
+    "upload": "Upload",
+    "convert": "Convert",
+    "download": "Download",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "delete": "Delete",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "applyToAll": "Apply to all"
+  },
+  "nav": {
+    "title": "Manga to Kindle",
+    "subtitle": "Convert manga to Kindle-compatible formats"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggle": "Toggle theme"
+  },
+  "language": {
+    "select": "Language",
+    "en": "English",
+    "es": "Spanish"
+  },
+  "upload": {
+    "title": "Upload Files",
+    "dropzone": {
+      "title": "Drag & drop manga files here",
+      "subtitle": "or click to select files",
+      "formats": "Supported formats: CBR, CBZ, ZIP, RAR, EPUB"
+    },
+    "fileList": {
+      "file": "File",
+      "size": "Size",
+      "pages": "Pages",
+      "format": "Format",
+      "preview": "Preview",
+      "order": "Order",
+      "noFiles": "No files uploaded yet",
+      "selectAll": "Select all files"
+    },
+    "dragToReorder": "Drag to reorder files for merging"
+  },
+  "metadata": {
+    "title": "Metadata",
+    "description": "Add metadata to your converted files",
+    "searchOnline": "Search Online",
+    "autoDetect": "Auto-detect from filename",
+    "coverHint": "Cover will be auto-extracted if not set",
+    "fields": {
+      "title": "Title",
+      "author": "Author",
+      "series": "Series",
+      "volume": "Volume/Chapter #",
+      "description": "Description",
+      "tags": "Tags"
+    },
+    "search": {
+      "title": "Search Manga Metadata",
+      "description": "Search MangaDex and AniList for metadata",
+      "placeholder": "Search manga title...",
+      "searching": "Searching...",
+      "noResults": "No results found",
+      "source": "Source",
+      "by": "by",
+      "emptyState": "Search for a manga to get started",
+      "applied": "Metadata applied"
+    }
+  },
+  "settings": {
+    "title": "Conversion Settings",
+    "outputFormat": {
+      "label": "Output Format",
+      "epub": "EPUB (Modern Kindle)",
+      "mobi": "MOBI (Older Kindle)",
+      "both": "Both EPUB & MOBI"
+    },
+    "namingPattern": {
+      "label": "File Naming Pattern",
+      "help": "Use {series}, {title}, {index} as placeholders"
+    },
+    "mergeFiles": {
+      "label": "Merge all files into one",
+      "description": "Combine all uploaded files into a single output file"
+    },
+    "maxSize": {
+      "label": "Max file size (MB)",
+      "description": "Files will be split if they exceed this size"
+    },
+    "epubMode": {
+      "label": "EPUB Extraction Mode",
+      "imagesOnly": "Extract images only",
+      "imagesOnlyDesc": "Treat EPUB like CBZ - extract all images",
+      "preserve": "Preserve structure",
+      "preserveDesc": "Try to keep chapter structure from source"
+    },
+    "estimatedSize": "Estimated output size",
+    "splitWarning": "Output will be split into {count} files"
+  },
+  "progress": {
+    "title": "Conversion Progress",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "extracting": "Extracting",
+      "merging": "Merging",
+      "splitting": "Splitting",
+      "converting": "Converting",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "processingFile": "Processing",
+    "allCompleted": "All files converted successfully",
+    "preparing": "Preparing conversion...",
+    "progressLabel": "Progress",
+    "downloads": "Downloads",
+    "downloadAll": "Download All (ZIP)",
+    "partOf": "Part {current} of {total}",
+    "restart": "Convert more files"
+  },
+  "steps": {
+    "upload": "Upload",
+    "metadata": "Metadata",
+    "settings": "Settings",
+    "download": "Download"
+  },
+  "errors": {
+    "uploadFailed": "Failed to upload files",
+    "conversionFailed": "Conversion failed",
+    "noFilesSelected": "Please select at least one file",
+    "titleRequired": "Title is required",
+    "invalidFormat": "Invalid file format"
+  },
+  "landing": {
+    "hero": {
+      "title": "Convert Manga to Kindle",
+      "subtitle": "Transform your CBR, CBZ, and EPUB manga files into Kindle-compatible formats with ease"
+    },
+    "features": {
+      "multiFormat": {
+        "title": "Multiple Formats",
+        "description": "Support for CBR, CBZ, ZIP, RAR, and EPUB input files"
+      },
+      "merge": {
+        "title": "Merge & Split",
+        "description": "Combine multiple files and auto-split large outputs"
+      },
+      "metadata": {
+        "title": "Smart Metadata",
+        "description": "Auto-detect series info and search online databases"
+      },
+      "kindle": {
+        "title": "Kindle Ready",
+        "description": "Optimized output for all Kindle devices"
+      }
+    },
+    "cta": "Start Converting"
+  }
+}

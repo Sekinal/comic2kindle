@@ -34,6 +34,10 @@ export default function ConvertPage() {
   const metadata = useConversionStore((s) => s.metadata);
   const namingPattern = useConversionStore((s) => s.namingPattern);
   const outputFormat = useConversionStore((s) => s.outputFormat);
+  const mergeFiles = useConversionStore((s) => s.mergeFiles);
+  const fileOrder = useConversionStore((s) => s.fileOrder);
+  const epubMode = useConversionStore((s) => s.epubMode);
+  const maxOutputSizeMb = useConversionStore((s) => s.maxOutputSizeMb);
   const currentJob = useConversionStore((s) => s.currentJob);
   const setCurrentJob = useConversionStore((s) => s.setCurrentJob);
   const reset = useConversionStore((s) => s.reset);
@@ -53,6 +57,10 @@ export default function ConvertPage() {
         metadata,
         output_format: outputFormat,
         naming_pattern: namingPattern,
+        epub_mode: epubMode,
+        merge_files: mergeFiles,
+        file_order: fileOrder,
+        max_output_size_mb: maxOutputSizeMb,
       });
       setCurrentJob(job);
       setActiveStep("download");

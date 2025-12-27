@@ -3,18 +3,18 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000/api
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend/src:/app/src:ro
-      - ./frontend/public:/app/public:ro
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - manga-net
+    restart: unless-stopped
 
   backend:
     build:
@@ -26,11 +26,13 @@ services:
       - PYTHONUNBUFFERED=1
       - UPLOAD_DIR=/app/uploads
       - OUTPUT_DIR=/app/output
+      - PREVIEW_DIR=/app/previews
       - MAX_UPLOAD_SIZE=500000000  # 500MB
+      - MAX_OUTPUT_FILE_SIZE=200000000  # 200MB (auto-split threshold)
     volumes:
       - uploads:/app/uploads
       - output:/app/output
-      - ./backend/app:/app/app:ro
+      - previews:/app/previews
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -39,11 +41,14 @@ services:
       start_period: 40s
     networks:
       - manga-net
+    restart: unless-stopped
 
 volumes:
   uploads:
     driver: local
   output:
+    driver: local
+  previews:
     driver: local
 
 networks:

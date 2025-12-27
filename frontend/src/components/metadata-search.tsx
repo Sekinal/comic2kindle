@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,8 @@ interface MetadataSearchProps {
 }
 
 export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
+  const t = useTranslations("metadata.search");
+  const tCommon = useTranslations("common");
   const metadata = useConversionStore((s) => s.metadata);
   const setMetadata = useConversionStore((s) => s.setMetadata);
   const [query, setQuery] = useState(metadata.title);
@@ -38,11 +41,11 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
       const data = await searchMetadata(query);
       setResults(data);
       if (data.length === 0) {
-        toast.info("No results found");
+        toast.info(t("noResults"));
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Search failed"
+        error instanceof Error ? error.message : tCommon("error")
       );
     } finally {
       setIsSearching(false);
@@ -58,22 +61,22 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
       series: result.title,
     });
     onOpenChange(false);
-    toast.success("Metadata applied");
+    toast.success(t("applied"));
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Search Manga Metadata</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>
-            Search MangaDex and AniList for metadata
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex gap-2">
           <Input
-            placeholder="Search manga title..."
+            placeholder={t("placeholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -112,7 +115,7 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
                   </div>
                   {result.author && (
                     <p className="text-sm text-muted-foreground">
-                      by {result.author}
+                      {t("by")} {result.author}
                     </p>
                   )}
                   {result.description && (
@@ -127,7 +130,7 @@ export function MetadataSearch({ open, onOpenChange }: MetadataSearchProps) {
             {results.length === 0 && !isSearching && (
               <div className="text-center py-8 text-muted-foreground">
                 <Search className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Search for a manga to get started</p>
+                <p>{t("emptyState")}</p>
               </div>
             )}
           </div>
