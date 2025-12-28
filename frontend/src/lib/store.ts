@@ -96,6 +96,7 @@ const defaultImageOptions: ImageProcessingOptions = {
   detect_spreads: true,
   rotate_spreads: true,
   fill_screen: true,
+  reading_direction: "rtl", // Manga default (right-to-left)
 };
 
 export const useConversionStore = create<ConversionState>((set, get) => ({

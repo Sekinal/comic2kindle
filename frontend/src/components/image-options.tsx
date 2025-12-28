@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Sparkles, Image, RotateCcw, Maximize } from "lucide-react";
+import { Sparkles, Image, RotateCcw, Maximize, BookOpen, BookText } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useConversionStore } from "@/lib/store";
 import { getCapabilities } from "@/lib/api";
-import type { UpscaleMethod } from "@/types";
+import type { UpscaleMethod, ReadingDirection } from "@/types";
 
 interface UpscaleOption {
   id: UpscaleMethod;
@@ -165,6 +165,45 @@ export function ImageOptions() {
               setImageOptions({ fill_screen: checked })
             }
           />
+        </div>
+      </div>
+
+      {/* Reading direction selection */}
+      <div className="space-y-3">
+        <Label className="text-sm">{t("readingDirection")}</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <Card
+            className={`cursor-pointer transition-all hover:border-primary ${
+              imageOptions.reading_direction === "rtl"
+                ? "border-primary bg-primary/5"
+                : ""
+            }`}
+            onClick={() => setImageOptions({ reading_direction: "rtl" })}
+          >
+            <CardContent className="flex items-center gap-3 p-3">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium">{t("manga")}</p>
+                <p className="text-xs text-muted-foreground">{t("mangaDesc")}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card
+            className={`cursor-pointer transition-all hover:border-primary ${
+              imageOptions.reading_direction === "ltr"
+                ? "border-primary bg-primary/5"
+                : ""
+            }`}
+            onClick={() => setImageOptions({ reading_direction: "ltr" })}
+          >
+            <CardContent className="flex items-center gap-3 p-3">
+              <BookText className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium">{t("comic")}</p>
+                <p className="text-xs text-muted-foreground">{t("comicDesc")}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

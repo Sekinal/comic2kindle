@@ -25,7 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useConversionStore } from "@/lib/store";
 import { deleteFile } from "@/lib/api";
-import { FileArchive, Images, Trash2, Loader2 } from "lucide-react";
+import { FileArchive, Images, Trash2, Loader2, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -39,12 +39,21 @@ export function FileList() {
   const t = useTranslations("upload.fileList");
   const tCommon = useTranslations("common");
   const files = useConversionStore((s) => s.files);
+  const fileOrder = useConversionStore((s) => s.fileOrder);
+  const reorderFile = useConversionStore((s) => s.reorderFile);
   const selectedFileIds = useConversionStore((s) => s.selectedFileIds);
   const toggleFileSelection = useConversionStore((s) => s.toggleFileSelection);
   const selectAllFiles = useConversionStore((s) => s.selectAllFiles);
   const setSelectedFileIds = useConversionStore((s) => s.setSelectedFileIds);
   const sessionId = useConversionStore((s) => s.sessionId);
   const removeFile = useConversionStore((s) => s.removeFile);
+
+  // Sort files according to fileOrder
+  const orderedFiles = [...files].sort((a, b) => {
+    const aIndex = fileOrder.indexOf(a.id);
+    const bIndex = fileOrder.indexOf(b.id);
+    return aIndex - bIndex;
+  });
 
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -102,6 +111,7 @@ export function FileList() {
                 aria-label={t("selectAll")}
               />
             </TableHead>
+            <TableHead className="w-16">{t("order")}</TableHead>
             <TableHead>{t("file")}</TableHead>
             <TableHead className="text-right">{t("size")}</TableHead>
             <TableHead className="text-right">{t("pages")}</TableHead>
@@ -109,7 +119,7 @@ export function FileList() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {files.map((file) => (
+          {orderedFiles.map((file, index) => (
             <TableRow key={file.id}>
               <TableCell>
                 <Checkbox
@@ -117,6 +127,31 @@ export function FileList() {
                   onCheckedChange={() => toggleFileSelection(file.id)}
                   aria-label={`Select ${file.original_name}`}
                 />
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === 0}
+                    onClick={() => reorderFile(index, index - 1)}
+                    aria-label={t("moveUp")}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === orderedFiles.length - 1}
+                    onClick={() => reorderFile(index, index + 1)}
+                    aria-label={t("moveDown")}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground w-4 text-center">{index + 1}</span>
+                </div>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">

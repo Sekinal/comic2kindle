@@ -5,7 +5,7 @@ import { useDropzone } from "react-dropzone";
 import { useTranslations } from "next-intl";
 import { Upload, FileArchive, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { uploadFiles } from "@/lib/api";
+import { uploadFiles, suggestFileOrder } from "@/lib/api";
 import { useConversionStore } from "@/lib/store";
 import { toast } from "sonner";
 
@@ -23,6 +23,7 @@ export function FileDropzone() {
   const [isUploading, setIsUploading] = useState(false);
   const setSession = useConversionStore((s) => s.setSession);
   const setMetadata = useConversionStore((s) => s.setMetadata);
+  const setFileOrder = useConversionStore((s) => s.setFileOrder);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -32,6 +33,16 @@ export function FileDropzone() {
       try {
         const response = await uploadFiles(acceptedFiles);
         setSession(response.session_id, response.files);
+
+        // Auto-order files by parsing filenames (Issue #1, Issue #2, etc.)
+        if (response.files.length > 1) {
+          try {
+            const suggestedOrder = await suggestFileOrder(response.session_id);
+            setFileOrder(suggestedOrder);
+          } catch {
+            // Fallback to upload order if suggestion fails
+          }
+        }
 
         // Auto-populate title from first file name
         if (response.files.length > 0) {
@@ -49,7 +60,7 @@ export function FileDropzone() {
         setIsUploading(false);
       }
     },
-    [setSession, setMetadata]
+    [setSession, setMetadata, setFileOrder]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

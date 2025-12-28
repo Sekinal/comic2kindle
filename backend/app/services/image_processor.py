@@ -222,11 +222,11 @@ class ImageProcessorService:
         return self._upscale_lanczos(img)
 
     def _resize_to_fill(self, img: Image.Image) -> Image.Image:
-        """Resize image to EXACTLY device dimensions with letterboxing/pillarboxing.
+        """Resize image to EXACTLY device dimensions using scale-to-fill and crop.
 
         For fixed-layout EPUBs, images must be exactly the target dimensions.
-        The image is scaled to fit within the device dimensions, then centered
-        on a black background of exactly target dimensions.
+        Like KCC, this scales the image to FILL the target (no black bars),
+        then crops any overflow from the center.
 
         Args:
             img: PIL Image to resize
@@ -234,33 +234,35 @@ class ImageProcessorService:
         Returns:
             Image at exactly target_width x target_height
         """
-        # Calculate scale to fit within target while maintaining aspect ratio
+        # Calculate scale to FILL target (use max, not min - this ensures no black bars)
         scale_w = self.target_width / img.width
         scale_h = self.target_height / img.height
-        scale = min(scale_w, scale_h)  # Fit within bounds
+        scale = max(scale_w, scale_h)  # Fill the target, may overflow
 
         new_width = int(img.width * scale)
         new_height = int(img.height * scale)
 
-        # Resize the image
+        # Resize the image to fill (will be >= target in both dimensions)
         if new_width != img.width or new_height != img.height:
-            logger.debug(f"Resizing from {img.size} to ({new_width}, {new_height})")
+            logger.debug(f"Scaling from {img.size} to ({new_width}, {new_height}) to fill")
             img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
         # If already exact target size, return as-is
         if img.width == self.target_width and img.height == self.target_height:
             return img
 
-        # Create black background at exact target dimensions and paste image centered
-        background = Image.new("RGB", (self.target_width, self.target_height), (0, 0, 0))
-        x_offset = (self.target_width - img.width) // 2
-        y_offset = (self.target_height - img.height) // 2
-        background.paste(img, (x_offset, y_offset))
+        # Crop from center to exact target dimensions
+        left = (img.width - self.target_width) // 2
+        top = (img.height - self.target_height) // 2
+        right = left + self.target_width
+        bottom = top + self.target_height
+
+        img = img.crop((left, top, right, bottom))
 
         logger.debug(
-            f"Created fixed-layout image: {background.size} (original scaled to {img.size})"
+            f"Cropped to fixed-layout: {img.size} (removed {left}px left/right, {top}px top/bottom)"
         )
-        return background
+        return img
 
     def _resize_to_fit(self, img: Image.Image) -> Image.Image:
         """Resize image to fit within device dimensions (downscale only).

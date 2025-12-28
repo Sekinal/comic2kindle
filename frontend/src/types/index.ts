@@ -31,6 +31,9 @@ export type DeviceProfileId =
 /** Image upscaling method */
 export type UpscaleMethod = "none" | "lanczos" | "ai_esrgan";
 
+/** Reading direction for the ebook */
+export type ReadingDirection = "rtl" | "ltr";
+
 /** Chapter information for flexible metadata */
 export interface ChapterInfo {
   chapter_start: number | null;
@@ -49,6 +52,7 @@ export interface ImageProcessingOptions {
   detect_spreads: boolean;
   rotate_spreads: boolean;
   fill_screen: boolean;
+  reading_direction: ReadingDirection;
 }
 
 /** Device profile information */

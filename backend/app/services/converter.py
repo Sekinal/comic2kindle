@@ -11,7 +11,12 @@ from ebooklib import epub
 from PIL import Image
 
 from app.config import settings
-from app.models.schemas import ImageProcessingOptions, MangaMetadata, OutputFormat
+from app.models.schemas import (
+    ImageProcessingOptions,
+    MangaMetadata,
+    OutputFormat,
+    ReadingDirection,
+)
 from app.services.image_processor import ImageProcessorService, ParallelImageProcessor
 
 logger = logging.getLogger(__name__)
@@ -83,8 +88,10 @@ class ConverterService:
         if metadata.description:
             book.add_metadata("DC", "description", metadata.description)
 
-        # Set reading direction for manga (right-to-left)
-        book.set_direction("rtl")
+        # Set reading direction (RTL for manga, LTR for comics)
+        direction = self.image_options.reading_direction.value
+        book.set_direction(direction)
+        logger.debug(f"Set reading direction: {direction}")
 
         # Add fixed-layout metadata for proper Kindle rendering
         # This is critical - Kindle needs these to render manga correctly

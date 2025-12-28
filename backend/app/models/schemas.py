@@ -65,6 +65,13 @@ class UpscaleMethod(str, Enum):
     AI_ESRGAN = "ai_esrgan"
 
 
+class ReadingDirection(str, Enum):
+    """Reading direction for the ebook."""
+
+    RTL = "rtl"  # Right-to-left (manga style)
+    LTR = "ltr"  # Left-to-right (comic style)
+
+
 class FileInfo(BaseModel):
     """Information about an uploaded file."""
 
@@ -131,6 +138,7 @@ class ImageProcessingOptions(BaseModel):
     detect_spreads: bool = True
     rotate_spreads: bool = True
     fill_screen: bool = True
+    reading_direction: ReadingDirection = ReadingDirection.RTL  # Manga default
 
 
 class MangaMetadata(BaseModel):

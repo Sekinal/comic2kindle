@@ -50,7 +50,9 @@
       "noFiles": "No files uploaded yet",
       "selectAll": "Select all files",
       "removeFile": "Remove file",
-      "confirmRemove": "Remove this file from conversion?"
+      "confirmRemove": "Remove this file from conversion?",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
     },
     "dragToReorder": "Drag to reorder files for merging"
   },
@@ -84,7 +86,12 @@
     "rotateSpreads": "Rotate spreads for reading",
     "rotateSpreadsDesc": "Rotate spreads 90° for portrait viewing",
     "fillScreen": "Fill screen",
-    "fillScreenDesc": "Size images to fill the device screen"
+    "fillScreenDesc": "Size images to fill the device screen",
+    "readingDirection": "Reading Direction",
+    "manga": "Manga",
+    "mangaDesc": "Right-to-left (Japanese style)",
+    "comic": "Comic",
+    "comicDesc": "Left-to-right (Western style)"
   },
   "chapter": {
     "title": "Chapter Information",

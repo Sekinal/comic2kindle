@@ -50,7 +50,9 @@
       "noFiles": "No hay archivos subidos",
       "selectAll": "Seleccionar todos los archivos",
       "removeFile": "Quitar archivo",
-      "confirmRemove": "¿Quitar este archivo de la conversión?"
+      "confirmRemove": "¿Quitar este archivo de la conversión?",
+      "moveUp": "Mover arriba",
+      "moveDown": "Mover abajo"
     },
     "dragToReorder": "Arrastra para reordenar archivos para combinar"
   },
@@ -84,7 +86,12 @@
     "rotateSpreads": "Rotar páginas para lectura",
     "rotateSpreadsDesc": "Rotar páginas dobles 90° para vista vertical",
     "fillScreen": "Llenar pantalla",
-    "fillScreenDesc": "Ajustar imágenes para llenar la pantalla del dispositivo"
+    "fillScreenDesc": "Ajustar imágenes para llenar la pantalla del dispositivo",
+    "readingDirection": "Dirección de Lectura",
+    "manga": "Manga",
+    "mangaDesc": "Derecha a izquierda (estilo japonés)",
+    "comic": "Cómic",
+    "comicDesc": "Izquierda a derecha (estilo occidental)"
   },
   "chapter": {
     "title": "Información de Capítulo",
