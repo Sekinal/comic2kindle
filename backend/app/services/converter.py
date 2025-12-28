@@ -86,6 +86,25 @@ class ConverterService:
         # Set reading direction for manga (right-to-left)
         book.set_direction("rtl")
 
+        # Add fixed-layout metadata for proper Kindle rendering
+        # This is critical - Kindle needs these to render manga correctly
+        book.add_metadata(None, "meta", "", {"name": "fixed-layout", "content": "true"})
+        book.add_metadata(
+            None,
+            "meta",
+            "",
+            {"name": "original-resolution", "content": f"{target_width}x{target_height}"},
+        )
+        book.add_metadata(None, "meta", "", {"name": "book-type", "content": "comic"})
+        book.add_metadata(None, "meta", "", {"name": "zero-gutter", "content": "true"})
+        book.add_metadata(None, "meta", "", {"name": "zero-margin", "content": "true"})
+        book.add_metadata(
+            None, "meta", "", {"property": "rendition:layout", "content": "pre-paginated"}
+        )
+        book.add_metadata(
+            None, "meta", "", {"property": "rendition:spread", "content": "landscape"}
+        )
+
         # Process and add cover (done separately, not part of parallel batch)
         cover_path = cover_image or (images[0] if images else None)
         if cover_path:
@@ -125,22 +144,23 @@ class ConverterService:
             book.add_item(image_item)
 
             # Create HTML page for the image with proper viewport for e-reader
+            # Using KCC-style fixed-layout format for best Kindle compatibility
             chapter = epub.EpubHtml(
                 title=f"Page {page_num}",
                 file_name=f"page_{page_num:04d}.xhtml",
                 lang="en",
             )
-            # ebooklib expects content as bytes, without XML declaration
+            # KCC-style HTML with explicit dimensions for fixed-layout EPUB
             html_content = f"""<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Page {page_num}</title>
-    <meta name="viewport" content="width={target_width}, height={target_height}"/>
-    <link rel="stylesheet" type="text/css" href="style/main.css"/>
+<title>Page {page_num}</title>
+<link href="style/main.css" type="text/css" rel="stylesheet"/>
+<meta name="viewport" content="width={target_width}, height={target_height}"/>
 </head>
 <body>
-    <div class="page-container">
-        <img src="images/{image_name}" alt="Page {page_num}"/>
-    </div>
+<div>
+<img width="{target_width}" height="{target_height}" src="images/{image_name}" alt="Page {page_num}"/>
+</div>
 </body>
 </html>"""
             chapter.content = html_content.encode("utf-8")
@@ -157,50 +177,21 @@ class ConverterService:
         # Set spine
         book.spine = spine
 
-        # Add CSS optimized for full-screen manga display
-        style = f"""
-@page {{
-    margin: 0;
-    padding: 0;
-}}
-html, body {{
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #000;
-    overflow: hidden;
-}}
-.page-container {{
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #000;
-    box-sizing: border-box;
-}}
-img {{
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    display: block;
-}}
-/* Fixed dimensions for consistent rendering on e-readers */
-@media amzn-kf8 {{
-    .page-container {{
-        width: {target_width}px;
-        height: {target_height}px;
-    }}
-}}
-@media amzn-mobi {{
-    .page-container {{
-        width: {target_width}px;
-        height: {target_height}px;
-    }}
-}}
+        # KCC-style minimal CSS for fixed-layout EPUB
+        # Fixed-layout EPUBs don't need complex CSS - the viewport handles sizing
+        style = """
+@page {
+margin: 0;
+}
+body {
+display: block;
+margin: 0;
+padding: 0;
+background-color: #000000;
+}
+div {
+text-align: center;
+}
 """
         css = epub.EpubItem(
             uid="style",

@@ -222,18 +222,19 @@ class ImageProcessorService:
         return self._upscale_lanczos(img)
 
     def _resize_to_fill(self, img: Image.Image) -> Image.Image:
-        """Resize image to fill device screen while maintaining aspect ratio.
+        """Resize image to EXACTLY device dimensions with letterboxing/pillarboxing.
 
-        The image is scaled to fit within the device dimensions,
-        potentially with letterboxing/pillarboxing for the EPUB viewer.
+        For fixed-layout EPUBs, images must be exactly the target dimensions.
+        The image is scaled to fit within the device dimensions, then centered
+        on a black background of exactly target dimensions.
 
         Args:
             img: PIL Image to resize
 
         Returns:
-            Resized image
+            Image at exactly target_width x target_height
         """
-        # Calculate scale to fit within target
+        # Calculate scale to fit within target while maintaining aspect ratio
         scale_w = self.target_width / img.width
         scale_h = self.target_height / img.height
         scale = min(scale_w, scale_h)  # Fit within bounds
@@ -241,11 +242,25 @@ class ImageProcessorService:
         new_width = int(img.width * scale)
         new_height = int(img.height * scale)
 
-        if new_width == img.width and new_height == img.height:
+        # Resize the image
+        if new_width != img.width or new_height != img.height:
+            logger.debug(f"Resizing from {img.size} to ({new_width}, {new_height})")
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # If already exact target size, return as-is
+        if img.width == self.target_width and img.height == self.target_height:
             return img
 
-        logger.debug(f"Resizing from {img.size} to ({new_width}, {new_height})")
-        return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Create black background at exact target dimensions and paste image centered
+        background = Image.new("RGB", (self.target_width, self.target_height), (0, 0, 0))
+        x_offset = (self.target_width - img.width) // 2
+        y_offset = (self.target_height - img.height) // 2
+        background.paste(img, (x_offset, y_offset))
+
+        logger.debug(
+            f"Created fixed-layout image: {background.size} (original scaled to {img.size})"
+        )
+        return background
 
     def _resize_to_fit(self, img: Image.Image) -> Image.Image:
         """Resize image to fit within device dimensions (downscale only).
