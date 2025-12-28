@@ -38,7 +38,7 @@
     "dropzone": {
       "title": "Arrastra y suelta archivos de manga aquí",
       "subtitle": "o haz clic para seleccionar archivos",
-      "formats": "Formatos soportados: CBR, CBZ, ZIP, RAR, EPUB"
+      "formats": "Formatos soportados: CBR, CBZ, ZIP, RAR, EPUB, PNG, JPG, WEBP, GIF"
     },
     "fileList": {
       "file": "Archivo",

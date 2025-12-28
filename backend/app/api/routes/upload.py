@@ -24,7 +24,9 @@ from app.services.merger import MergerService
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-ALLOWED_EXTENSIONS = {".cbr", ".cbz", ".zip", ".rar", ".epub"}
+ALLOWED_ARCHIVE_EXTENSIONS = {".cbr", ".cbz", ".zip", ".rar", ".epub"}
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff", ".tif"}
+ALLOWED_EXTENSIONS = ALLOWED_ARCHIVE_EXTENSIONS | ALLOWED_IMAGE_EXTENSIONS
 
 
 def _get_input_format(extension: str) -> InputFormat:
@@ -48,8 +50,13 @@ async def upload_files(
     merger: MergerService = Depends(get_merger),
 ) -> UploadResponse:
     """
-    Upload manga files (CBR/CBZ/EPUB) for conversion.
+    Upload manga files (CBR/CBZ/EPUB) or image files for conversion.
 
+    Supports:
+    - Archive files: CBR, CBZ, ZIP, RAR, EPUB
+    - Image files: PNG, JPG, JPEG, WEBP, GIF, BMP, TIFF
+
+    When images are uploaded, they are grouped into a single "folder" entry.
     Creates a new session and stores the uploaded files.
     Returns the session ID and file information.
     """
@@ -59,11 +66,18 @@ async def upload_files(
             detail="No files provided",
         )
 
-    # Validate file extensions
+    # Separate archives and images
+    archive_files: list[UploadFile] = []
+    image_files: list[UploadFile] = []
+
     for f in files:
         if f.filename:
             ext = "." + f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-            if ext not in ALLOWED_EXTENSIONS:
+            if ext in ALLOWED_ARCHIVE_EXTENSIONS:
+                archive_files.append(f)
+            elif ext in ALLOWED_IMAGE_EXTENSIONS:
+                image_files.append(f)
+            else:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid file type: {f.filename}. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
@@ -72,9 +86,11 @@ async def upload_files(
     # Create session
     session_id = file_manager.create_session()
     saved_files: list[FileInfo] = []
+    order_counter = 0
 
     try:
-        for order, upload_file in enumerate(files):
+        # Handle archive files
+        for upload_file in archive_files:
             if not upload_file.filename:
                 continue
 
@@ -87,7 +103,8 @@ async def upload_files(
 
             # Set input format
             file_info.input_format = _get_input_format(file_info.extension)
-            file_info.order = order
+            file_info.order = order_counter
+            order_counter += 1
 
             # Count pages in the archive
             file_path = file_manager.get_file_path(
@@ -104,6 +121,75 @@ async def upload_files(
             # Estimate output size (rough estimate based on file size)
             file_info.estimated_output_size = int(file_info.size * 0.8)
 
+            saved_files.append(file_info)
+
+        # Handle image files - group them into a single "folder" entry
+        if image_files:
+            import uuid
+            from datetime import datetime
+            from PIL import Image
+            import io
+
+            folder_id = str(uuid.uuid4())[:8]
+            images_dir = file_manager.get_session_dir(session_id) / f"{folder_id}_images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+
+            total_size = 0
+            first_image_path = None
+
+            # Sort images by filename for initial order
+            sorted_images = sorted(image_files, key=lambda f: f.filename or "")
+
+            for idx, img_file in enumerate(sorted_images):
+                if not img_file.filename:
+                    continue
+
+                content = await img_file.read()
+                total_size += len(content)
+
+                # Save with ordered filename to preserve order
+                ext = "." + img_file.filename.rsplit(".", 1)[-1].lower()
+                ordered_filename = f"{idx:04d}_{img_file.filename}"
+                img_path = images_dir / ordered_filename
+                img_path.write_bytes(content)
+
+                if first_image_path is None:
+                    first_image_path = img_path
+
+            # Generate preview from first image
+            preview_url = None
+            if first_image_path:
+                preview_path = settings.preview_dir / session_id / f"{folder_id}.jpg"
+                preview_path.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    with Image.open(first_image_path) as img:
+                        img.thumbnail((settings.preview_thumbnail_width, settings.preview_thumbnail_height))
+                        if img.mode in ("RGBA", "P"):
+                            img = img.convert("RGB")
+                        img.save(preview_path, "JPEG", quality=85)
+                    preview_url = f"/api/upload/{session_id}/{folder_id}/preview"
+                except Exception:
+                    pass
+
+            # Create a single FileInfo for the image folder
+            folder_name = "Uploaded Images"
+            if sorted_images and sorted_images[0].filename:
+                # Try to extract a common prefix from filenames
+                first_name = sorted_images[0].filename.rsplit(".", 1)[0]
+                folder_name = first_name if first_name else "Uploaded Images"
+
+            file_info = FileInfo(
+                id=folder_id,
+                original_name=folder_name,
+                size=total_size,
+                page_count=len(image_files),
+                extension=".images",
+                input_format=InputFormat.IMAGES,
+                preview_url=preview_url,
+                order=order_counter,
+                estimated_output_size=int(total_size * 0.8),
+                uploaded_at=datetime.now(),
+            )
             saved_files.append(file_info)
 
     except Exception as e:
@@ -137,24 +223,52 @@ async def list_session_files(
         )
 
     files: list[FileInfo] = []
-    for order, file_path in enumerate(file_manager.list_files(session_id)):
-        if file_path.suffix.lower() in ALLOWED_EXTENSIONS:
-            file_id = file_path.stem
+    order = 0
+
+    for item in session_dir.iterdir():
+        # Handle archive files
+        if item.is_file() and item.suffix.lower() in ALLOWED_ARCHIVE_EXTENSIONS:
+            file_id = item.stem
             preview_path = settings.preview_dir / session_id / f"{file_id}.jpg"
 
             files.append(
                 FileInfo(
                     id=file_id,
-                    original_name=file_path.name,
-                    size=file_path.stat().st_size,
-                    page_count=extractor.count_pages(file_path),
-                    extension=file_path.suffix.lower(),
-                    input_format=_get_input_format(file_path.suffix),
+                    original_name=item.name,
+                    size=item.stat().st_size,
+                    page_count=extractor.count_pages(item),
+                    extension=item.suffix.lower(),
+                    input_format=_get_input_format(item.suffix),
                     preview_url=f"/api/upload/{session_id}/{file_id}/preview" if preview_path.exists() else None,
                     order=order,
-                    estimated_output_size=int(file_path.stat().st_size * 0.8),
+                    estimated_output_size=int(item.stat().st_size * 0.8),
                 )
             )
+            order += 1
+
+        # Handle image folders
+        elif item.is_dir() and item.name.endswith("_images"):
+            file_id = item.name[:-7]  # Remove "_images" suffix
+            preview_path = settings.preview_dir / session_id / f"{file_id}.jpg"
+
+            # Calculate total size and page count
+            total_size = sum(f.stat().st_size for f in item.iterdir() if f.is_file())
+            page_count = sum(1 for f in item.iterdir() if f.suffix.lower() in ALLOWED_IMAGE_EXTENSIONS)
+
+            files.append(
+                FileInfo(
+                    id=file_id,
+                    original_name="Uploaded Images",
+                    size=total_size,
+                    page_count=page_count,
+                    extension=".images",
+                    input_format=InputFormat.IMAGES,
+                    preview_url=f"/api/upload/{session_id}/{file_id}/preview" if preview_path.exists() else None,
+                    order=order,
+                    estimated_output_size=int(total_size * 0.8),
+                )
+            )
+            order += 1
 
     return files
 
@@ -184,12 +298,17 @@ async def update_file_order(
             detail=f"Session not found: {session_id}",
         )
 
-    # Get all files
-    all_files = {fp.stem: fp for fp in file_manager.list_files(session_id)}
+    # Get all files and image folders
+    all_items: dict[str, Path] = {}
+    for item in session_dir.iterdir():
+        if item.is_file() and item.suffix.lower() in ALLOWED_ARCHIVE_EXTENSIONS:
+            all_items[item.stem] = item
+        elif item.is_dir() and item.name.endswith("_images"):
+            all_items[item.name[:-7]] = item  # Remove "_images" suffix
 
     # Validate all file IDs exist
     for file_id in order_update.file_order:
-        if file_id not in all_files:
+        if file_id not in all_items:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File not found: {file_id}",
@@ -198,22 +317,41 @@ async def update_file_order(
     # Create ordered file list
     ordered_files: list[FileInfo] = []
     for order, file_id in enumerate(order_update.file_order):
-        file_path = all_files[file_id]
+        item_path = all_items[file_id]
         preview_path = settings.preview_dir / session_id / f"{file_id}.jpg"
 
-        ordered_files.append(
-            FileInfo(
-                id=file_id,
-                original_name=file_path.name,
-                size=file_path.stat().st_size,
-                page_count=extractor.count_pages(file_path),
-                extension=file_path.suffix.lower(),
-                input_format=_get_input_format(file_path.suffix),
-                preview_url=f"/api/upload/{session_id}/{file_id}/preview" if preview_path.exists() else None,
-                order=order,
-                estimated_output_size=int(file_path.stat().st_size * 0.8),
+        if item_path.is_dir():
+            # Image folder
+            total_size = sum(f.stat().st_size for f in item_path.iterdir() if f.is_file())
+            page_count = sum(1 for f in item_path.iterdir() if f.suffix.lower() in ALLOWED_IMAGE_EXTENSIONS)
+            ordered_files.append(
+                FileInfo(
+                    id=file_id,
+                    original_name="Uploaded Images",
+                    size=total_size,
+                    page_count=page_count,
+                    extension=".images",
+                    input_format=InputFormat.IMAGES,
+                    preview_url=f"/api/upload/{session_id}/{file_id}/preview" if preview_path.exists() else None,
+                    order=order,
+                    estimated_output_size=int(total_size * 0.8),
+                )
             )
-        )
+        else:
+            # Archive file
+            ordered_files.append(
+                FileInfo(
+                    id=file_id,
+                    original_name=item_path.name,
+                    size=item_path.stat().st_size,
+                    page_count=extractor.count_pages(item_path),
+                    extension=item_path.suffix.lower(),
+                    input_format=_get_input_format(item_path.suffix),
+                    preview_url=f"/api/upload/{session_id}/{file_id}/preview" if preview_path.exists() else None,
+                    order=order,
+                    estimated_output_size=int(item_path.stat().st_size * 0.8),
+                )
+            )
 
     return ordered_files
 
@@ -311,14 +449,25 @@ async def suggest_file_order(
             detail=f"Session not found: {session_id}",
         )
 
-    files = list(file_manager.list_files(session_id))
-    filenames = [f.name for f in files]
+    # Get all files and image folders with their IDs
+    items: list[tuple[str, str]] = []  # List of (file_id, display_name)
+    for item in session_dir.iterdir():
+        if item.is_file() and item.suffix.lower() in ALLOWED_ARCHIVE_EXTENSIONS:
+            items.append((item.stem, item.name))
+        elif item.is_dir() and item.name.endswith("_images"):
+            file_id = item.name[:-7]  # Remove "_images" suffix
+            items.append((file_id, "Uploaded Images"))
+
+    if not items:
+        return []
+
+    filenames = [name for _, name in items]
 
     # Get suggested order indices
     order_indices = filename_parser.suggest_order(filenames)
 
     # Return file IDs in suggested order
-    return [files[idx].stem for idx in order_indices]
+    return [items[idx][0] for idx in order_indices]
 
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -368,15 +517,23 @@ async def delete_file(
             detail=f"Session not found: {session_id}",
         )
 
-    # Find and delete the file
-    file_found = False
-    for file_path in file_manager.list_files(session_id):
-        if file_path.stem == file_id:
-            file_path.unlink()
-            file_found = True
+    # Find and delete the file or image folder
+    import shutil as shutil_delete
+
+    item_found = False
+    for item in session_dir.iterdir():
+        # Check for regular file
+        if item.is_file() and item.stem == file_id:
+            item.unlink()
+            item_found = True
+            break
+        # Check for image folder
+        elif item.is_dir() and item.name == f"{file_id}_images":
+            shutil_delete.rmtree(item)
+            item_found = True
             break
 
-    if not file_found:
+    if not item_found:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"File not found: {file_id}",

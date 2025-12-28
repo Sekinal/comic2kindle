@@ -30,6 +30,23 @@ router = APIRouter(prefix="/convert", tags=["convert"])
 jobs: dict[str, ConversionJob] = {}
 
 
+def _find_file_by_id(session_dir: Path, file_id: str) -> Path | None:
+    """Find a file or image folder by ID in the session directory.
+
+    Handles both:
+    - Regular archive files: {file_id}.cbz, {file_id}.epub, etc.
+    - Image folders: {file_id}_images/
+    """
+    for f in session_dir.iterdir():
+        # Match regular files by stem
+        if f.is_file() and f.stem == file_id:
+            return f
+        # Match image folders by pattern {file_id}_images
+        if f.is_dir() and f.name == f"{file_id}_images":
+            return f
+    return None
+
+
 def _update_job(job_id: str, **kwargs: Any) -> None:
     """Update job fields."""
     if job_id in jobs:
@@ -114,12 +131,8 @@ async def _run_individual_conversion(
     total_files = len(file_ids)
 
     for idx, file_id in enumerate(file_ids):
-        # Find the file
-        file_path = None
-        for f in session_dir.iterdir():
-            if f.stem == file_id:
-                file_path = f
-                break
+        # Find the file or image folder
+        file_path = _find_file_by_id(session_dir, file_id)
 
         if not file_path:
             _update_job(
@@ -236,11 +249,8 @@ async def _run_merged_conversion(
 
         # Phase 1: Extract all files
         for idx, file_id in enumerate(file_ids):
-            file_path = None
-            for f in session_dir.iterdir():
-                if f.stem == file_id:
-                    file_path = f
-                    break
+            # Find the file or image folder
+            file_path = _find_file_by_id(session_dir, file_id)
 
             if not file_path:
                 _update_job(
@@ -369,14 +379,21 @@ async def start_conversion(
             detail=f"Session not found: {request.session_id}",
         )
 
-    # Validate files exist
-    available_files = {f.stem for f in session_dir.iterdir()}
+    # Validate files exist (handles both regular files and image folders)
+    available_ids: set[str] = set()
+    for f in session_dir.iterdir():
+        if f.is_file():
+            available_ids.add(f.stem)
+        elif f.is_dir() and f.name.endswith("_images"):
+            # Extract ID from folder name like "{file_id}_images"
+            available_ids.add(f.name[:-7])  # Remove "_images" suffix
+
     all_file_ids = set(request.file_ids)
     if request.file_order:
         all_file_ids.update(request.file_order)
 
     for file_id in all_file_ids:
-        if file_id not in available_files:
+        if file_id not in available_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"File not found: {file_id}",

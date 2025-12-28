@@ -2,7 +2,7 @@
 export type OutputFormat = "epub" | "mobi" | "both";
 
 /** Input format types */
-export type InputFormat = "cbz" | "cbr" | "epub" | "zip" | "rar";
+export type InputFormat = "cbz" | "cbr" | "epub" | "zip" | "rar" | "images";
 
 /** EPUB extraction mode */
 export type EpubExtractionMode = "images_only" | "preserve";

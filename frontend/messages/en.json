@@ -38,7 +38,7 @@
     "dropzone": {
       "title": "Drag & drop manga files here",
       "subtitle": "or click to select files",
-      "formats": "Supported formats: CBR, CBZ, ZIP, RAR, EPUB"
+      "formats": "Supported formats: CBR, CBZ, ZIP, RAR, EPUB, PNG, JPG, WEBP, GIF"
     },
     "fileList": {
       "file": "File",

@@ -10,11 +10,19 @@ import { useConversionStore } from "@/lib/store";
 import { toast } from "sonner";
 
 const ACCEPTED_TYPES = {
+  // Archives
   "application/x-cbr": [".cbr"],
   "application/x-cbz": [".cbz"],
   "application/zip": [".zip"],
   "application/x-rar-compressed": [".rar"],
   "application/epub+zip": [".epub"],
+  // Images
+  "image/png": [".png"],
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/webp": [".webp"],
+  "image/gif": [".gif"],
+  "image/bmp": [".bmp"],
+  "image/tiff": [".tiff", ".tif"],
 };
 
 export function FileDropzone() {
@@ -47,7 +55,7 @@ export function FileDropzone() {
         // Auto-populate title from first file name
         if (response.files.length > 0) {
           const firstName = response.files[0].original_name;
-          const baseName = firstName.replace(/\.(cbr|cbz|zip|rar|epub)$/i, "");
+          const baseName = firstName.replace(/\.(cbr|cbz|zip|rar|epub|images)$/i, "");
           setMetadata({ title: baseName, series: baseName });
         }
 

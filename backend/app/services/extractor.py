@@ -52,6 +52,10 @@ class ExtractorService:
         output_dir.mkdir(parents=True, exist_ok=True)
         extension = archive_path.suffix.lower()
 
+        # Handle image folder (directory of images, not an archive)
+        if archive_path.is_dir():
+            return self._extract_image_folder(archive_path, output_dir)
+
         if extension in {".cbz", ".zip"}:
             return self._extract_zip(archive_path, output_dir)
         elif extension in {".cbr", ".rar"}:
@@ -148,6 +152,26 @@ class ExtractorService:
 
         return self._sort_images(extracted_images)
 
+    def _extract_image_folder(self, folder_path: Path, output_dir: Path) -> list[Path]:
+        """Extract images from a folder (copy to output directory).
+
+        Args:
+            folder_path: Path to the folder containing images
+            output_dir: Directory to copy images to
+
+        Returns:
+            List of paths to copied images, sorted by name
+        """
+        extracted_images: list[Path] = []
+
+        for img_path in sorted(folder_path.iterdir()):
+            if img_path.suffix.lower() in IMAGE_EXTENSIONS:
+                target_path = output_dir / img_path.name
+                shutil.copy2(img_path, target_path)
+                extracted_images.append(target_path)
+
+        return self._sort_images(extracted_images)
+
     def _sanitize_filename(self, name: str) -> str:
         """Create a clean filename from a potentially nested path."""
         # Get just the filename part
@@ -173,7 +197,15 @@ class ExtractorService:
         return sorted(images, key=extract_number)
 
     def count_pages(self, archive_path: Path) -> int:
-        """Count the number of image pages in an archive."""
+        """Count the number of image pages in an archive or folder."""
+        # Handle image folder
+        if archive_path.is_dir():
+            return sum(
+                1
+                for f in archive_path.iterdir()
+                if f.suffix.lower() in IMAGE_EXTENSIONS
+            )
+
         extension = archive_path.suffix.lower()
 
         if extension in {".cbz", ".zip"}:

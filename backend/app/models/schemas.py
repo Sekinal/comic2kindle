@@ -23,6 +23,7 @@ class InputFormat(str, Enum):
     EPUB = "epub"
     ZIP = "zip"
     RAR = "rar"
+    IMAGES = "images"  # Folder of loose images
 
 
 class EpubExtractionMode(str, Enum):
