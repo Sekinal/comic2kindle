@@ -157,16 +157,19 @@ class ConverterService:
                 file_name=f"page_{page_num:04d}.xhtml",
                 lang="en",
             )
-            # KCC-style HTML with explicit dimensions for fixed-layout EPUB
-            html_content = f"""<html xmlns="http://www.w3.org/1999/xhtml">
+            # KCC-style HTML with explicit dimensions and positioning for fixed-layout EPUB
+            # The top:0% is critical - it ensures no content is cut off at the bottom
+            html_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head>
 <title>Page {page_num}</title>
 <link href="style/main.css" type="text/css" rel="stylesheet"/>
 <meta name="viewport" content="width={target_width}, height={target_height}"/>
 </head>
 <body>
-<div>
-<img width="{target_width}" height="{target_height}" src="images/{image_name}" alt="Page {page_num}"/>
+<div style="text-align:center;top:0%;">
+<img width="{target_width}" height="{target_height}" src="images/{image_name}"/>
 </div>
 </body>
 </html>"""
@@ -186,18 +189,14 @@ class ConverterService:
 
         # KCC-style minimal CSS for fixed-layout EPUB
         # Fixed-layout EPUBs don't need complex CSS - the viewport handles sizing
-        style = """
-@page {
+        # Matches KCC exactly: no background-color, minimal styles
+        style = """@page {
 margin: 0;
 }
 body {
 display: block;
 margin: 0;
 padding: 0;
-background-color: #000000;
-}
-div {
-text-align: center;
 }
 """
         css = epub.EpubItem(
