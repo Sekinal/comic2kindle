@@ -19,10 +19,14 @@ class FilenameParserService:
         r"^(.+?)\s*[-_]\s*[Cc]h(?:apter)?\.?\s*(\d+)",
         # "Series Name Chapter 001"
         r"^(.+?)\s+[Cc]h(?:apter)?\.?\s*(\d+)",
+        # "Issue #1", "Issue #2", etc.
+        r"^(.+?)\s*#\s*(\d+)",
         # "Series Name - Vol.01"
         r"^(.+?)\s*[-_]\s*[Vv]ol(?:ume)?\.?\s*(\d+)",
         # "Series Name Vol.01"
         r"^(.+?)\s+[Vv]ol(?:ume)?\.?\s*(\d+)",
+        # "Part 1", "Part 2", etc.
+        r"^(.+?)\s+[Pp]art\.?\s*(\d+)",
         # "Series Name - 001"
         r"^(.+?)\s*[-_]\s*(\d{2,4})(?:\s|$|\.)",
         # "Series Name 001"
@@ -96,15 +100,38 @@ class FilenameParserService:
         """
         parsed = [(idx, self.parse(f)) for idx, f in enumerate(filenames)]
 
-        def sort_key(item: tuple[int, FilenameParseResult]) -> tuple[int, int, str]:
+        def sort_key(item: tuple[int, FilenameParseResult]) -> tuple[int, int, int, str]:
             idx, result = item
             vol = result.volume or 0
             ch = result.chapter or 0
-            # Sort by volume, then chapter, then original filename
-            return (vol, ch, filenames[idx])
+
+            # If no chapter/volume found, try to extract any number from filename
+            fallback_num = 0
+            if ch == 0 and vol == 0:
+                fallback_num = self._extract_number(filenames[idx])
+
+            # Sort by volume, then chapter, then fallback number, then original filename
+            return (vol, ch, fallback_num, filenames[idx])
 
         sorted_items = sorted(parsed, key=sort_key)
         return [item[0] for item in sorted_items]
+
+    def _extract_number(self, filename: str) -> int:
+        """Extract the most relevant number from a filename for sorting."""
+        name = Path(filename).stem
+
+        # Look for patterns like #1, #2, etc.
+        hash_match = re.search(r"#\s*(\d+)", name)
+        if hash_match:
+            return int(hash_match.group(1))
+
+        # Look for any number in the filename
+        numbers = re.findall(r"(\d+)", name)
+        if numbers:
+            # Return the last number (usually the most specific, e.g., "Series Vol 1 Ch 5" -> 5)
+            return int(numbers[-1])
+
+        return 0
 
     def suggest_series_name(self, filenames: list[str]) -> str | None:
         """
