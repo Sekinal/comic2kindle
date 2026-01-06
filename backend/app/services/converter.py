@@ -177,24 +177,20 @@ class ConverterService:
                 file_name=f"page_{page_num:04d}.xhtml",
                 lang="en",
             )
-            # KCC-style HTML with explicit dimensions and positioning for fixed-layout EPUB
-            # Matching KCC exactly: hidden div anchor, calculated top margin, empty body style
-            html_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
-<head>
-<title>Page {page_num}</title>
-<link href="style/main.css" type="text/css" rel="stylesheet"/>
-<meta name="viewport" content="width={target_width}, height={target_height}"/>
-</head>
-<body style="">
+
+            # Add CSS link and viewport meta using ebooklib's API
+            # This ensures they're included in the final HTML head
+            chapter.add_link(href="style/main.css", rel="stylesheet", type="text/css")
+            chapter.add_meta(name="viewport", content=f"width={target_width}, height={target_height}")
+
+            # KCC-style body content with hidden div anchor and proper positioning
+            body_content = f"""<body style="">
 <div style="text-align:center;top:{top_margin}%;">
 <div style="display:none;">.</div>
 <img width="{img_width}" height="{img_height}" src="images/{image_name}"/>
 </div>
-</body>
-</html>"""
-            chapter.content = html_content.encode("utf-8")
+</body>"""
+            chapter.content = body_content.encode("utf-8")
 
             book.add_item(chapter)
             chapters.append(chapter)
