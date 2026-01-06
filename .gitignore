@@ -99,3 +99,17 @@ converted/
 
 # TypeScript
 *.tsbuildinfo
+
+# Test files - comics and ebooks
+*.cbz
+*.cbr
+*.cb7
+*.cbt
+*.epub
+*.mobi
+*.azw
+*.azw3
+*.pdf
+*.zip
+*.rar
+*.7z
