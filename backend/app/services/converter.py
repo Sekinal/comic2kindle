@@ -158,7 +158,7 @@ class ConverterService:
                 lang="en",
             )
             # KCC-style HTML with explicit dimensions and positioning for fixed-layout EPUB
-            # The top:0% is critical - it ensures no content is cut off at the bottom
+            # Matching KCC exactly: hidden div anchor, top:0.0%, empty body style
             html_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
@@ -167,8 +167,9 @@ class ConverterService:
 <link href="style/main.css" type="text/css" rel="stylesheet"/>
 <meta name="viewport" content="width={target_width}, height={target_height}"/>
 </head>
-<body>
-<div style="text-align:center;top:0%;">
+<body style="">
+<div style="text-align:center;top:0.0%;">
+<div style="display:none;">.</div>
 <img width="{target_width}" height="{target_height}" src="images/{image_name}"/>
 </div>
 </body>
