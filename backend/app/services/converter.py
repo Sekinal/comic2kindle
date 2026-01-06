@@ -95,6 +95,7 @@ class ConverterService:
 
         # Add fixed-layout metadata for proper Kindle rendering
         # This is critical - Kindle needs these to render manga correctly
+        # Matching KCC metadata exactly for best compatibility
         book.add_metadata(None, "meta", "", {"name": "fixed-layout", "content": "true"})
         book.add_metadata(
             None,
@@ -103,8 +104,16 @@ class ConverterService:
             {"name": "original-resolution", "content": f"{target_width}x{target_height}"},
         )
         book.add_metadata(None, "meta", "", {"name": "book-type", "content": "comic"})
+        book.add_metadata(
+            None, "meta", "", {"name": "primary-writing-mode", "content": "horizontal-lr"}
+        )
         book.add_metadata(None, "meta", "", {"name": "zero-gutter", "content": "true"})
         book.add_metadata(None, "meta", "", {"name": "zero-margin", "content": "true"})
+        # Kindle-specific: border settings - ke-border-width=0 removes margins!
+        book.add_metadata(None, "meta", "", {"name": "ke-border-color", "content": "#FFFFFF"})
+        book.add_metadata(None, "meta", "", {"name": "ke-border-width", "content": "0"})
+        book.add_metadata(None, "meta", "", {"name": "orientation-lock", "content": "none"})
+        book.add_metadata(None, "meta", "", {"name": "region-mag", "content": "true"})
         book.add_metadata(
             None, "meta", "", {"property": "rendition:layout", "content": "pre-paginated"}
         )
