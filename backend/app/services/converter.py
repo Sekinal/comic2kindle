@@ -149,6 +149,12 @@ class ConverterService:
         for idx, image_content in processed_images:
             page_num = idx + 1
 
+            # Get actual image dimensions from processed content
+            with Image.open(BytesIO(image_content)) as img:
+                img_width, img_height = img.size
+
+            logger.debug(f"Page {page_num}: image={img_width}x{img_height}, target={target_width}x{target_height}")
+
             # Create image item
             image_name = f"page_{page_num:04d}.jpg"
             image_item = epub.EpubItem(
@@ -159,6 +165,11 @@ class ConverterService:
             )
             book.add_item(image_item)
 
+            # Calculate top margin like KCC does - center image if smaller than viewport
+            top_margin = 0.0
+            if img_height < target_height:
+                top_margin = round(((target_height - img_height) / 2) / target_height * 100, 1)
+
             # Create HTML page for the image with proper viewport for e-reader
             # Using KCC-style fixed-layout format for best Kindle compatibility
             chapter = epub.EpubHtml(
@@ -167,7 +178,7 @@ class ConverterService:
                 lang="en",
             )
             # KCC-style HTML with explicit dimensions and positioning for fixed-layout EPUB
-            # Matching KCC exactly: hidden div anchor, top:0.0%, empty body style
+            # Matching KCC exactly: hidden div anchor, calculated top margin, empty body style
             html_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
@@ -177,9 +188,9 @@ class ConverterService:
 <meta name="viewport" content="width={target_width}, height={target_height}"/>
 </head>
 <body style="">
-<div style="text-align:center;top:0.0%;">
+<div style="text-align:center;top:{top_margin}%;">
 <div style="display:none;">.</div>
-<img width="{target_width}" height="{target_height}" src="images/{image_name}"/>
+<img width="{img_width}" height="{img_height}" src="images/{image_name}"/>
 </div>
 </body>
 </html>"""
