@@ -113,3 +113,10 @@ converted/
 *.zip
 *.rar
 *.7z
+
+# Image test files
+*.jpeg
+*.jpg
+*.png
+*.gif
+*.webp
