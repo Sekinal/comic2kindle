@@ -22,6 +22,7 @@ interface DeviceInfo {
 const DEVICE_ICONS: Record<string, React.ReactNode> = {
   kindle_basic: <Smartphone className="h-6 w-6" />,
   kindle_paperwhite_5: <Tablet className="h-6 w-6" />,
+  kindle_colorsoft: <Tablet className="h-6 w-6 text-emerald-500" />,
   kindle_scribe: <Monitor className="h-6 w-6" />,
   kobo_clara_2e: <Smartphone className="h-6 w-6" />,
   kobo_libra_2: <Tablet className="h-6 w-6" />,

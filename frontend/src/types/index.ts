@@ -22,6 +22,7 @@ export type ConversionStatus =
 export type DeviceProfileId =
   | "kindle_basic"
   | "kindle_paperwhite_5"
+  | "kindle_colorsoft"
   | "kindle_scribe"
   | "kobo_clara_2e"
   | "kobo_libra_2"

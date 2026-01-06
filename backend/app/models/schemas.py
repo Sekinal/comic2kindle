@@ -51,6 +51,7 @@ class DeviceProfile(str, Enum):
 
     KINDLE_BASIC = "kindle_basic"
     KINDLE_PAPERWHITE_5 = "kindle_paperwhite_5"
+    KINDLE_COLORSOFT = "kindle_colorsoft"
     KINDLE_SCRIBE = "kindle_scribe"
     KOBO_CLARA_2E = "kobo_clara_2e"
     KOBO_LIBRA_2 = "kobo_libra_2"

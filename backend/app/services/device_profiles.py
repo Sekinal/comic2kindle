@@ -58,6 +58,17 @@ DEVICE_SPECS: dict[str, DeviceSpec] = {
         dpi=300,
         recommended_format="epub",
     ),
+    DeviceProfile.KINDLE_COLORSOFT.value: DeviceSpec(
+        id=DeviceProfile.KINDLE_COLORSOFT.value,
+        name="kindle_colorsoft",
+        display_name="Kindle Colorsoft (7\")",
+        manufacturer="kindle",
+        width=1264,
+        height=1680,
+        dpi=300,
+        supports_color=True,
+        recommended_format="epub",
+    ),
     DeviceProfile.KINDLE_SCRIBE.value: DeviceSpec(
         id=DeviceProfile.KINDLE_SCRIBE.value,
         name="kindle_scribe",
